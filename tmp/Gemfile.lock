@@ -1,0 +1,16 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    front_matter_parser (0.2.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  front_matter_parser
+
+RUBY VERSION
+   ruby 2.6.2p47
+
+BUNDLED WITH
+   1.17.2
