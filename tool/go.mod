@@ -1,4 +1,4 @@
-module github.com/icco/postmortems/generator
+module github.com/icco/postmortems/tool
 
 go 1.12
 
