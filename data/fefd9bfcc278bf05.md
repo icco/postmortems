@@ -1,0 +1,13 @@
+---
+
+url: "http://42gems.com/blog/?p=735"
+start_time: ""
+end_time: ""
+categories:
+- postmortem
+company: "Intel"
+product: ""
+
+---
+
+A scripting bug caused the generation of the divider logic in the Pentium to very occasionally produce incorrect results. The bug wasn't caught in testing because of an incorrect assumption in a proof of correctness.
