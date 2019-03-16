@@ -138,7 +138,7 @@
 
 [GPS/GLONASS](http://www.gps.gov/governance/advisory/meetings/2014-06/beutler1.pdf). A bad update that caused incorrect orbital mechanics calculations caused GPS satellites that use GLONASS to broadcast incorrect positions for 10 hours. The bug was noticed and rolled back almost immediately due to (?) this didn't fix the issue.
 
-[Healthcare.gov](https://plus.google.com/+AndreasSchou/posts/FhWtABz7ew9).
+[Healthcare.gov](https://plus.google.com/+AndreasSchou/posts/FhWtABz7ew9). A large system had launch issues.
 
 [Heroku](https://status.heroku.com/incidents/642?postmortem). Having a system that requires scheduled manual updates resulted in an error which caused US customers to be unable to scale, stop or restart dynos, or route HTTP traffic, and also prevented all customers from being able to deploy.
 
@@ -176,13 +176,9 @@
 
 [Parity](https://paritytech.io/the-multi-sig-hack-a-postmortem/). $30 million of cryptocurrency value was diverted (stolen) with another $150 million diverted to a safe place (rescued), after a 4000-line software change containing a security bug was mistakenly labelled as a UI change, inadequately reviewed, deployed, and used by various unsuspecting third parties. See also [this analysis](http://hackingdistributed.com/2017/07/22/deep-dive-parity-bug/).
 
-
 [Platform.sh](https://medium.com/@florian_7764/technical-post-mortem-of-the-august-incident-82ab4c3d6547). Outage during a scheduled maintenance window because there were too much data for Zookeeper to boot.
 
-[Reddit](https://www.reddit.com/r/announcements/comments/4y0m56/why_reddit_was_down_on_aug_11/)
-experienced an outage for 1.5 hours, followed by another 1.5 hours of
-degraded performance on Thursday August 11 2016. This was due to an error during
-a migration of a critical backend system.
+[Reddit](https://www.reddit.com/r/announcements/comments/4y0m56/why_reddit_was_down_on_aug_11/). Experienced an outage for 1.5 hours, followed by another 1.5 hours of degraded performance on Thursday August 11 2016. This was due to an error during a migration of a critical backend system.
 
 [Salesforce](https://help.salesforce.com/apex/HTViewSolution?urlname=Root-Cause-Message-for-Disruption-of-Service-on-NA14-May-2016&language=en_US). Initial disruption due to power failure in one datacenter led to cascading failures with a database cluster and file discrepancies resulting in cross data center failover issues.
 
