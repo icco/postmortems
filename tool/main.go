@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -57,7 +59,20 @@ func main() {
 
 // Generate outputs all content in json for parsing by our website.
 func Generate(d string) error {
-	return fmt.Errorf("not implemented")
+	baseDir := "./output"
+	os.MkdirAll(baseDir, os.ModePerm)
+
+	fp := filepath.Join(baseDir, "categories.json")
+	j, err := json.Marshal(Categories)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(fp, j, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ValidateDir takes a directory path and validates every file in there.
