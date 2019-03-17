@@ -55,10 +55,12 @@ func main() {
 	}
 }
 
+// Generate outputs all content in json for parsing by our website.
 func Generate(d string) error {
 	return fmt.Errorf("not implemented")
 }
 
+// ValidateDir takes a directory path and validates every file in there.
 func ValidateDir(d string) error {
 	return filepath.Walk(d, func(path string, info os.FileInfo, err error) error {
 		// Failed to open path
@@ -77,6 +79,7 @@ func ValidateDir(d string) error {
 	})
 }
 
+// ValidateFile takes a file path and validates just that file.
 func ValidateFile(filename string) error {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -111,6 +114,8 @@ func ValidateFile(filename string) error {
 	return nil
 }
 
+// CategoriesContain takes a string and decides if it is in the category
+// whitelist.
 func CategoriesContain(e string) bool {
 	for _, a := range Categories {
 		if a == e {
