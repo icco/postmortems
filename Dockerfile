@@ -10,4 +10,3 @@ RUN /go/bin/tool -action=generate
 
 FROM halverneus/static-file-server:latest
 COPY --from=builder /go/src/github.com/icco/graphql/output/ /web/
-RUN ls -al
