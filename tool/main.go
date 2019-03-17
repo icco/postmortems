@@ -94,21 +94,21 @@ func ValidateFile(filename string) error {
 	}
 
 	if url, ok := fm["url"].(string); !ok || url == "" {
-		return fmt.Errorf("%s: URL is empty.", filename)
+		return fmt.Errorf("%s: url is empty", filename)
 	}
 
 	if cats, ok := fm["categories"].([]interface{}); ok {
 		for _, c := range cats {
 			if cat, ok := c.(string); ok {
 				if !CategoriesContain(cat) {
-					return fmt.Errorf("%s: %s is not a valid category.", filename, cat)
+					return fmt.Errorf("%s: %s is not a valid category", filename, cat)
 				}
 			}
 		}
 	}
 
 	if body == "" {
-		return fmt.Errorf("%s: Body / Description is empty.", filename)
+		return fmt.Errorf("%s: description is empty", filename)
 	}
 
 	return nil
