@@ -54,7 +54,7 @@
 [Google](https://status.cloud.google.com/incident/compute/17003#5660850647990272). Many changes to a rarely modified load balancer were applied through a very slow code path. This froze all public addressing changes for ~2 hours.
 [Google](https://status.cloud.google.com/incident/compute/17007#5659118702428160). A bug in configuration roll-out to a load balancer lead to increased error rates for 22 minutes.
 [Google](https://status.cloud.google.com/incident/storage/19002). A configuration change intended to address an uptick in demand for metadata storage, which overloaded part of the blob lookup system, which caused a cascading failure with user-visible service impact to Gmail, Google Photos, Google Drive, and other GCP services dependent on blob storage.
-[Healthcare.gov](https://plus.google.com/+AndreasSchou/posts/FhWtABz7ew9).
+[Healthcare.gov](https://plus.google.com/+AndreasSchou/posts/FhWtABz7ew9). A large organizational failure to build a website for United States healthcare.
 [Heroku](https://engineering.heroku.com/blogs/2017-02-15-filesystem-corruption-on-heroku-dynos/). An upgrade silently disabled a check that was meant to prevent filesystem corruption in running containers. A subsequent deploy caused filesystem corruption in running containers.
 [Heroku](https://status.heroku.com/incidents/1042). An upstream `apt` update broke pinned packages which lead to customers experiencing write permission failures to `/dev`.
 [Heroku](https://status.heroku.com/incidents/1091). An automated remote configuration change did not propagate fully. Web dynos could not be started.
