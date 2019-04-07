@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -69,6 +70,7 @@ type Postmortem struct {
 	Description string
 }
 
+// Parse turns an io stream into a Postmortem type.
 func Parse(f io.Reader) (*Postmortem, error) {
 	p := &Postmortem{}
 
@@ -163,6 +165,11 @@ func ValidateFile(filename string) error {
 
 	if p.URL == "" {
 		return fmt.Errorf("%s: url is empty", filename)
+	}
+
+	_, err := url.Parse("https://example.org")
+	if err != nil {
+		return err
 	}
 
 	for _, cat := range p.Categories {
