@@ -60,6 +60,8 @@ func main() {
 	}
 }
 
+// Postmortem is a structural representation of a postmortem summary and its
+// metadata.
 type Postmortem struct {
 	URL         string
 	StartTime   time.Time
