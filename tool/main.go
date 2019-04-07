@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gernest/front"
 )
@@ -57,6 +60,62 @@ func main() {
 	}
 }
 
+// Postmortem is a structural representation of a postmortem summary and its
+// metadata.
+type Postmortem struct {
+	URL         string
+	StartTime   time.Time
+	EndTime     time.Time
+	Categories  []string
+	Company     string
+	Product     string
+	Description string
+}
+
+// Parse turns an io stream into a Postmortem type.
+func Parse(f io.Reader) (*Postmortem, error) {
+	p := &Postmortem{}
+
+	m := front.NewMatter()
+	m.Handle("---", front.YAMLHandler)
+	fm, body, err := m.Parse(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if startTime, ok := fm["start_time"].(time.Time); ok {
+		p.StartTime = startTime
+	}
+
+	if endTime, ok := fm["end_time"].(time.Time); ok {
+		p.EndTime = endTime
+	}
+
+	if url, ok := fm["url"].(string); ok {
+		p.URL = url
+	}
+
+	if company, ok := fm["company"].(string); ok {
+		p.Company = company
+	}
+
+	if product, ok := fm["product"].(string); ok {
+		p.Product = product
+	}
+
+	if cats, ok := fm["categories"].([]interface{}); ok {
+		for _, c := range cats {
+			if cat, ok := c.(string); ok {
+				p.Categories = append(p.Categories, cat)
+			}
+		}
+	}
+
+	p.Description = body
+
+	return p, nil
+}
+
 // Generate outputs all content in json for parsing by our website.
 func Generate(d string) error {
 	baseDir := "./output"
@@ -72,7 +131,40 @@ func Generate(d string) error {
 		return err
 	}
 
-	return nil
+	return filepath.Walk(d, func(path string, info os.FileInfo, err error) error {
+		// Failed to open path
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() {
+			f, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+
+			fName := filepath.Base(path)
+			extName := filepath.Ext(path)
+			id := fName[:len(fName)-len(extName)]
+
+			p, err := Parse(f)
+			if err != nil {
+				return err
+			}
+
+			fp := filepath.Join(baseDir, fmt.Sprintf("%s.json", id))
+			j, err := json.Marshal(p)
+			if err != nil {
+				return err
+			}
+			err = ioutil.WriteFile(fp, j, 0644)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 // ValidateDir takes a directory path and validates every file in there.
@@ -101,28 +193,27 @@ func ValidateFile(filename string) error {
 		return err
 	}
 
-	m := front.NewMatter()
-	m.Handle("---", front.YAMLHandler)
-	fm, body, err := m.Parse(f)
+	p, err := Parse(f)
 	if err != nil {
 		return err
 	}
 
-	if url, ok := fm["url"].(string); !ok || url == "" {
+	if p.URL == "" {
 		return fmt.Errorf("%s: url is empty", filename)
 	}
 
-	if cats, ok := fm["categories"].([]interface{}); ok {
-		for _, c := range cats {
-			if cat, ok := c.(string); ok {
-				if !CategoriesContain(cat) {
-					return fmt.Errorf("%s: %s is not a valid category", filename, cat)
-				}
-			}
+	_, err = url.Parse(p.URL)
+	if err != nil {
+		return err
+	}
+
+	for _, cat := range p.Categories {
+		if !CategoriesContain(cat) {
+			return fmt.Errorf("%s: %s is not a valid category", filename, cat)
 		}
 	}
 
-	if body == "" {
+	if p.Description == "" {
 		return fmt.Errorf("%s: description is empty", filename)
 	}
 

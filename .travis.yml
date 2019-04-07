@@ -6,4 +6,8 @@ env:
   GO111MODULE: "on"
 
 script:
-- go run ./tool -action=validate
+- go test -v -race -cover ./tool
+- go vet ./tool
+- go run golang.org/x/lint/golint -set_exit_status ./tool
+- go run github.com/fzipp/gocyclo -avg ./tool
+- cd tool && go run . -action=validate -dir=../data/
