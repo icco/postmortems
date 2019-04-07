@@ -10,4 +10,4 @@ script:
 - go vet ./...
 - go run golang.org/x/lint/golint -set_exit_status ./tool
 - go run github.com/fzipp/gocyclo -avg ./tool
-- go run ./tool -action=validate
+- cd tool && go run . -action=validate
