@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gernest/front"
 )
@@ -57,6 +59,59 @@ func main() {
 	}
 }
 
+type Postmortem struct {
+	URL         string
+	StartTime   time.Time
+	EndTime     time.Time
+	Categories  []string
+	Company     string
+	Product     string
+	Description string
+}
+
+func Parse(f io.Reader) (*Postmortem, error) {
+	p := &Postmortem{}
+
+	m := front.NewMatter()
+	m.Handle("---", front.YAMLHandler)
+	fm, body, err := m.Parse(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if startTime, ok := fm["start_time"].(time.Time); ok {
+		p.StartTime = startTime
+	}
+
+	if endTime, ok := fm["end_time"].(time.Time); ok {
+		p.EndTime = endTime
+	}
+
+	if url, ok := fm["url"].(string); ok {
+		p.URL = url
+	}
+
+	if company, ok := fm["company"].(string); ok {
+		p.Company = company
+	}
+
+	if product, ok := fm["product"].(string); ok {
+		p.Product = product
+	}
+
+	if cats, ok := fm["categories"].([]interface{}); ok {
+		for _, c := range cats {
+			if cat, ok := c.(string); ok {
+				p.Categories = append(p.Categories, cat)
+			}
+		}
+	}
+
+	p.Description = body
+
+	return p, nil
+}
+
 // Generate outputs all content in json for parsing by our website.
 func Generate(d string) error {
 	baseDir := "./output"
@@ -101,28 +156,22 @@ func ValidateFile(filename string) error {
 		return err
 	}
 
-	m := front.NewMatter()
-	m.Handle("---", front.YAMLHandler)
-	fm, body, err := m.Parse(f)
+	p, err := Parse(f)
 	if err != nil {
 		return err
 	}
 
-	if url, ok := fm["url"].(string); !ok || url == "" {
+	if p.URL == "" {
 		return fmt.Errorf("%s: url is empty", filename)
 	}
 
-	if cats, ok := fm["categories"].([]interface{}); ok {
-		for _, c := range cats {
-			if cat, ok := c.(string); ok {
-				if !CategoriesContain(cat) {
-					return fmt.Errorf("%s: %s is not a valid category", filename, cat)
-				}
-			}
+	for _, cat := range p.Categories {
+		if !CategoriesContain(cat) {
+			return fmt.Errorf("%s: %s is not a valid category", filename, cat)
 		}
 	}
 
-	if body == "" {
+	if p.Description == "" {
 		return fmt.Errorf("%s: description is empty", filename)
 	}
 
