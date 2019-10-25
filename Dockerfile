@@ -14,4 +14,4 @@ RUN /go/bin/tool -action=generate
 
 FROM halverneus/static-file-server:latest
 COPY --from=builder /go/src/github.com/icco/postmortems/output/ /web/
-RUN echo "ok." > /web/healthz
+COPY --from=builder /go/src/github.com/icco/postmortems/tmp/healthz /web/
