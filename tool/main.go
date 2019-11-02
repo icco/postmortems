@@ -91,12 +91,14 @@ func main() {
 	if action == nil || *action == "" {
 		fmt.Println("no action specified")
 		usage()
+
 		return
 	}
 
 	if dir == nil || *dir == "" {
 		fmt.Println("no directory specified")
 		usage()
+
 		return
 	}
 

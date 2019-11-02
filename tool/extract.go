@@ -3,20 +3,21 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"text/template"
+
+	guuid "github.com/google/uuid"
 )
 
 var re = regexp.MustCompile(`^\[(.+)\]\((.+)\)\. (.+)$`)
 
 var defaultBody = `---
 
+uuid: "{{ .UUID }}"
 url: ""
 start_time: ""
 end_time: ""
@@ -30,16 +31,6 @@ product: ""
 {{ .Data }}
 `
 
-// randomHex generates a random hex string intended for postmortem filenames.
-func randomHex(n int) (string, error) {
-	bytes := make([]byte, n)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(bytes), nil
-}
-
 // ExtractPostmortems reads the collection of postmortems
 // and extracts each postmortem to a separate file.
 func ExtractPostmortems(dir string) error {
@@ -52,11 +43,15 @@ func ExtractPostmortems(dir string) error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		body := defaultBody
-		pm := Postmortem{Description: scanner.Text()}
+
+		// Generate a random string to set as UUID.
+		id := guuid.New()
+		pm := Postmortem{UUID: id.String(), Description: scanner.Text()}
 
 		if re.Match(scanner.Bytes()) {
 			body = `---
 
+uuid: "{{ .UUID }}"
 url: "{{ .URL }}"
 start_time: ""
 end_time: ""
@@ -70,7 +65,7 @@ product: ""
 {{ .Description }}
 `
 			matches := re.FindStringSubmatch(scanner.Text())
-			pm = Postmortem{URL: matches[2], Company: matches[1], Description: matches[3]}
+			pm = Postmortem{UUID: id.String(), URL: matches[2], Company: matches[1], Description: matches[3]}
 		}
 
 		err = savePostmortem(pm, body, dir)
@@ -96,14 +91,8 @@ func savePostmortem(pm Postmortem, body, dir string) error {
 		return fmt.Errorf("error executing template: %w", err)
 	}
 
-	// Generate a random string to set as filename.
-	fnm, err := randomHex(8)
-	if err != nil {
-		return fmt.Errorf("error generating hex string: %w", err)
-	}
-
 	// Write postmortem data from memory to file.
-	err = ioutil.WriteFile(filepath.Join(dir, fnm+".md"), data.Bytes(), 0644)
+	err := ioutil.WriteFile(filepath.Join(dir, pm.UUID+".md"), data.Bytes(), 0644)
 	if err != nil {
 		return fmt.Errorf("error writing file: %w", err)
 	}
