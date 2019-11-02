@@ -1,0 +1,14 @@
+---
+
+uuid: "e34b4e2e-bdf9-4cc2-89bb-b7b8e9f35c6a"
+url: "https://blog.cloudflare.com/how-and-why-the-leap-second-affected-cloudflare-dns/"
+start_time: ""
+end_time: ""
+categories:
+- postmortem
+company: "Cloudflare"
+product: ""
+
+---
+
+Backwards time flow from tracking [the 27th leap second on 2016-12-31T23:59:60Z](https://hpiers.obspm.fr/iers/bul/bulc/bulletinc.52) caused the weighted round-robin selection of DNS resolvers (RRDNS) to panic and fail on some CNAME lookups.  Go's `time.Now()` was incorrectly assumed to be monotonic; this injected negative values into calls to `rand.Int63n()`, which panics in that case.

@@ -10,6 +10,7 @@ import (
 // Postmortem is a structural representation of a postmortem summary and its
 // metadata.
 type Postmortem struct {
+	UUID        string
 	URL         string
 	StartTime   time.Time
 	EndTime     time.Time
@@ -29,6 +30,10 @@ func Parse(f io.Reader) (*Postmortem, error) {
 	fm, body, err := m.Parse(f)
 	if err != nil {
 		return nil, err
+	}
+
+	if uuid, ok := fm["uuid"].(string); ok {
+		p.UUID = uuid
 	}
 
 	if startTime, ok := fm["start_time"].(time.Time); ok {
