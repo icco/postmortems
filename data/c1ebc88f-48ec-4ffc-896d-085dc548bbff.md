@@ -1,0 +1,14 @@
+---
+
+uuid: "c1ebc88f-48ec-4ffc-896d-085dc548bbff"
+url: "https://blog.thousandeyes.com/steam-outage-monitor-data-center-connectivity/"
+start_time: ""
+end_time: ""
+categories:
+- postmortem
+company: "Valve"
+product: ""
+
+---
+
+Although there's no official postmortem, it looks like a bad BGP config severed Valve's connection to Level 3, Telia, and Abovenet/Zayo, which resulted in a global Steam outage.

@@ -13,7 +13,7 @@ import (
 	guuid "github.com/google/uuid"
 )
 
-var re = regexp.MustCompile(`^\[(.+)\]\((.+)\)\. (.+)$`)
+var re = regexp.MustCompile(`^\[(.+?)\]\((.+?)\)\. (.+)$`)
 
 var defaultBody = `---
 
