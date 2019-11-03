@@ -1,0 +1,11 @@
+{{define "title"}}Postmortems{{end}}
+
+{{define "body"}}
+
+<h1>Postmortems Index Page</h1>
+<ul>
+    {{ range . }}
+    <li><a href="postmortem/{{ .UUID }}">{{ .Company }}: {{ .UUID }}</a></li>
+    {{end}}
+</ul>
+{{end}}

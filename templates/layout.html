@@ -1,0 +1,16 @@
+{{define "layout"}}
+ <!DOCTYPE html>
+<html>
+<head>
+ <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>{{template "title" .}}</title>
+</head>
+<body>
+    <header>
+        <a href="/">Home</a>
+        <a href="/categories">Categories</a>
+    </header>
+  {{ template "body" . }}
+</body>
+</html>
+{{end}}

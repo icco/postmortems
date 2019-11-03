@@ -1,0 +1,10 @@
+{{define "title"}}Categories{{end}}
+
+{{define "body"}}
+<h3>Category</h3>
+<ul>
+    {{ range . }}
+    <li><a href="/category/{{ . }}">{{ . }}</a></li>
+    {{end}}
+</ul>
+{{end}}

@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 var (
@@ -84,6 +86,19 @@ func Generate(d string) error {
 	})
 }
 
+// Serve serves the content of the website.
+func Serve() {
+	router := createHandlers()
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	fmt.Printf("%s Server listening on *:%s\n", time.Now().Format("2006-01-02 15:04:05"), port)
+	log.Fatal(http.ListenAndServe(":"+port, router))
+}
+
 func main() {
 	flag.Usage = usage
 	flag.Parse()
@@ -111,6 +126,8 @@ func main() {
 		err = Generate(*dir)
 	case "validate":
 		err = ValidateDir(*dir)
+	case "serve":
+		Serve()
 	default:
 		log.Fatalf("%s is not a valid action", *action)
 	}
@@ -134,4 +151,5 @@ Actions:
 extract     Extract postmortems from the collection and create separate files.
 generate    Generate JSON files from the postmortem Markdown files.
 validate    Validate the postmortem files in the directory.
+serve       Serve the postmortem files in a small website.
 `

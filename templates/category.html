@@ -1,0 +1,10 @@
+{{define "title"}}Category: {{ .Category }}{{end}}
+
+{{define "body"}}
+<h3>Category: {{ .Category }}</h3>
+<ul>
+    {{ range .Postmortems }}
+    <li><a href="/postmortem/{{ .UUID }}">{{ .Company}}: {{ .UUID }}</a></li>
+    {{end}}
+</ul>
+{{end}}
