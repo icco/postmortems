@@ -79,9 +79,9 @@ func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
 	return pms, nil
 }
 
-func categoriesPageHandler(w http.ResponseWriter, r *http.Request) {
+func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data interface{}) {
 	lp := filepath.Join("templates", "layout.html")
-	fp := filepath.Join("templates", "categories.html")
+	fp := filepath.Join("templates", view)
 
 	_, err := os.Stat(fp)
 	if err != nil {
@@ -100,10 +100,14 @@ func categoriesPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := tmpl.ExecuteTemplate(w, "layout", postmortems.Categories); err != nil {
+	if err := tmpl.ExecuteTemplate(w, "layout", data); err != nil {
 		log.Println(err.Error())
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
 	}
+}
+
+func categoriesPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderTemplate(w, r, "categories.html", postmortems.Categories)
 }
 
 func getPosmortemByCategory(pms []*postmortems.Postmortem, category string) []postmortems.Postmortem {
@@ -133,26 +137,6 @@ func categoryPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctpm := getPosmortemByCategory(pms, ct)
 
-	lp := filepath.Join("templates", "layout.html")
-	fp := filepath.Join("templates", "category.html")
-
-	_, err = os.Stat(fp)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Template doesn't exist, return 404.
-			http.NotFound(w, r)
-			return
-		}
-	}
-
-	tmpl, err := template.ParseFiles(lp, fp)
-	if err != nil {
-		log.Println(err.Error())
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
-
-		return
-	}
-
 	page := struct {
 		Category    string
 		Postmortems []postmortems.Postmortem
@@ -161,10 +145,7 @@ func categoryPageHandler(w http.ResponseWriter, r *http.Request) {
 		Postmortems: ctpm,
 	}
 
-	if err := tmpl.ExecuteTemplate(w, "layout", page); err != nil {
-		log.Println(err.Error())
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
-	}
+	renderTemplate(w, r, "category.html", page)
 }
 
 func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
@@ -176,34 +157,11 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
 	}
 
-	lp := filepath.Join("templates", "layout.html")
-	fp := filepath.Join("templates", "postmortem.html")
-
-	_, err = os.Stat(fp)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Template doesn't exist, return 404.
-			http.NotFound(w, r)
-			return
-		}
-	}
-
 	// Convert Markdown formatting of descriptions to HTML.
 	htmlDesc := blackfriday.Run([]byte(pm.Description))
 	pm.Description = string(htmlDesc)
 
-	tmpl, err := template.ParseFiles(lp, fp)
-	if err != nil {
-		log.Println(err.Error())
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
-
-		return
-	}
-
-	if err := tmpl.ExecuteTemplate(w, "layout", pm); err != nil {
-		log.Println(err.Error())
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
-	}
+	renderTemplate(w, r, "postmortem.html", pm)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -215,28 +173,5 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lp := filepath.Join("templates", "layout.html")
-	fp := filepath.Join("templates", "index.html")
-
-	_, err = os.Stat(fp)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Template doesn't exist, return 404.
-			http.NotFound(w, r)
-			return
-		}
-	}
-
-	tmpl, err := template.ParseFiles(lp, fp)
-	if err != nil {
-		log.Println(err.Error())
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
-
-		return
-	}
-
-	if err := tmpl.ExecuteTemplate(w, "layout", pms); err != nil {
-		log.Println(err.Error())
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
-	}
+	renderTemplate(w, r, "index.html", pms)
 }
