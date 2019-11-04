@@ -1,4 +1,4 @@
-package main
+package postmortems
 
 import (
 	"io"

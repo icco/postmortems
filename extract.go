@@ -1,4 +1,4 @@
-package main
+package postmortems
 
 import (
 	"bufio"
@@ -81,9 +81,9 @@ product: ""
 	return nil
 }
 
-// savePostmortem takes the in-memory representation of the postmortem file and
-// stores it in a file.
-func savePostmortem(pm Postmortem, body, dir string) error {
+// Save takes the in-memory representation of the postmortem file and stores it
+// in a file.
+func (pm *Postmortem) Save(body, dir string) error {
 	var data bytes.Buffer
 
 	fm := template.Must(template.New("newPostmortemTemplate").Parse(body))
