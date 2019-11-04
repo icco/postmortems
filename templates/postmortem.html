@@ -1,0 +1,18 @@
+{{define "title"}}Postmortem{{end}}
+
+{{define "body"}}
+<h1>{{ .Company }}</h1>
+<h3>Category</h3>
+
+<ul>
+{{ range .Categories }}
+<li><a href="category/{{ . }}">{{ . }}</a></li>
+{{end}}
+</ul>
+
+<p>
+{{ .Description }}
+</p>
+
+<a href="{{ .URL }}">Source</a>, <a href="https://github.com/icco/postmortems/blob/master/data/{{ .UUID }}.md">Edit Metadata</a>
+{{end}}
