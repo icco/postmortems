@@ -26,6 +26,7 @@ func Serve() error {
 	}
 
 	log.Printf("Server listening on http://0.0.0.0:%s", port)
+
 	return http.ListenAndServe(":"+port, router)
 }
 

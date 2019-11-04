@@ -18,6 +18,7 @@ var (
 	dir *string
 )
 
+// New creates a new HTTP routing handler.
 func New(d *string) http.Handler {
 	dir = d
 
