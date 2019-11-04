@@ -1,102 +1,32 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
-	"time"
+
+	"github.com/icco/postmortems"
+	"github.com/icco/postmortems/server"
 )
 
 var (
 	action = flag.String("action", "", "")
 	dir    = flag.String("dir", "./data/", "")
-
-	// Categories is a whitelist of valid categories that a postmortem can have.
-	Categories = [...]string{
-		"automation",
-		"cascading-failure",
-		"cloud",
-		"config-change",
-		"postmortem",
-		"security",
-		"time",
-		"undescriptive",
-	}
 )
 
-// Generate outputs all content in JSON for parsing by our website.
-func Generate(d string) error {
-	baseDir := "./output"
-
-	err := os.MkdirAll(baseDir, os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	fp := filepath.Join(baseDir, "categories.json")
-
-	j, err := json.Marshal(Categories)
-	if err != nil {
-		return err
-	}
-
-	err = ioutil.WriteFile(fp, j, 0644)
-	if err != nil {
-		return err
-	}
-
-	return filepath.Walk(d, func(path string, info os.FileInfo, err error) error {
-		// Failed to open path
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() {
-			f, err := os.Open(path)
-			if err != nil {
-				return err
-			}
-
-			fName := filepath.Base(path)
-			extName := filepath.Ext(path)
-			id := fName[:len(fName)-len(extName)]
-
-			p, err := Parse(f)
-			if err != nil {
-				return err
-			}
-
-			fp := filepath.Join(baseDir, fmt.Sprintf("%s.json", id))
-			j, err := json.Marshal(p)
-			if err != nil {
-				return err
-			}
-			err = ioutil.WriteFile(fp, j, 0644)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-}
-
 // Serve serves the content of the website.
-func Serve() {
-	router := createHandlers()
+func Serve() error {
+	router := server.New(dir)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	fmt.Printf("%s Server listening on *:%s\n", time.Now().Format("2006-01-02 15:04:05"), port)
-	log.Fatal(http.ListenAndServe(":"+port, router))
+	log.Printf("Server listening on http://0.0.0.0:%s", port)
+	return http.ListenAndServe(":"+port, router)
 }
 
 func main() {
@@ -104,14 +34,14 @@ func main() {
 	flag.Parse()
 
 	if action == nil || *action == "" {
-		fmt.Println("no action specified")
+		log.Print("no action specified")
 		usage()
 
 		return
 	}
 
 	if dir == nil || *dir == "" {
-		fmt.Println("no directory specified")
+		log.Print("no directory specified")
 		usage()
 
 		return
@@ -121,13 +51,13 @@ func main() {
 
 	switch *action {
 	case "extract":
-		err = ExtractPostmortems(*dir)
+		err = postmortems.ExtractPostmortems(*dir)
 	case "generate":
-		err = Generate(*dir)
+		err = postmortems.GenerateJSON(*dir)
 	case "validate":
-		err = ValidateDir(*dir)
+		err = postmortems.ValidateDir(*dir)
 	case "serve":
-		Serve()
+		err = Serve()
 	default:
 		log.Fatalf("%s is not a valid action", *action)
 	}
