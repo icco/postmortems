@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"fmt"
@@ -9,20 +9,21 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi"
+	"github.com/icco/postmortems"
 	blackfriday "gopkg.in/russross/blackfriday.v2"
 )
 
-// createHandlers sets the routes for the web server.
-func createHandlers() *mux.Router {
-	router := mux.NewRouter()
-	router.HandleFunc("/", indexHandler).Methods("GET")
-	router.HandleFunc("/postmortem/{id}", postmortemPageHandler).Methods("GET")
-	router.HandleFunc("/categories", categoriesPageHandler).Methods("GET")
-	router.HandleFunc("/category/{category}", categoryPageHandler).Methods("GET")
-	router.HandleFunc("/healthz", healthzHandler).Methods("GET")
+func New() http.Router {
+	r := chi.NewRouter()
 
-	return router
+	r.Get("/", indexHandler)
+	r.Get("/postmortem/{id}", postmortemPageHandler)
+	r.Get("/categories", categoriesPageHandler)
+	r.Get("/category/{category}", categoryPageHandler)
+	r.Get("/healthz", healthzHandler)
+
+	return r
 }
 
 // healthzHandler serves an availability check endpoint.
