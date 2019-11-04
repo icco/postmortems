@@ -1,17 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
-	"time"
 
 	"github.com/icco/postmortems"
+	"github.com/icco/postmortems/server"
 )
 
 var (
@@ -21,14 +18,14 @@ var (
 
 // Serve serves the content of the website.
 func Serve() error {
-	router := server.New()
+	router := server.New(dir)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	log.Printf("Server listening on 0.0.0.0:%s\n", time.Now(), port)
+	log.Printf("Server listening on http://0.0.0.0:%s", port)
 	return http.ListenAndServe(":"+port, router)
 }
 
@@ -56,7 +53,7 @@ func main() {
 	case "extract":
 		err = postmortems.ExtractPostmortems(*dir)
 	case "generate":
-		err = postmortems.Generate(*dir)
+		err = postmortems.GenerateJSON(*dir)
 	case "validate":
 		err = postmortems.ValidateDir(*dir)
 	case "serve":

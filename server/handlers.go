@@ -14,7 +14,13 @@ import (
 	blackfriday "gopkg.in/russross/blackfriday.v2"
 )
 
-func New() http.Router {
+var (
+	dir *string
+)
+
+func New(d *string) http.Handler {
+	dir = d
+
 	r := chi.NewRouter()
 
 	r.Get("/", indexHandler)
@@ -36,14 +42,14 @@ func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// loadPostmortem loads the postmortem data in memory.
-func loadPostmortem(dir, filename string) (*Postmortem, error) {
+// LoadPostmortem loads the postmortem data in memory.
+func LoadPostmortem(dir, filename string) (*postmortems.Postmortem, error) {
 	f, err := os.Open(filepath.Join(dir, filename))
 	if err != nil {
 		return nil, fmt.Errorf("error opening postmortem: %w", err)
 	}
 
-	pm, err := Parse(f)
+	pm, err := postmortems.Parse(f)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing file %s: %w", f.Name(), err)
 	}
@@ -51,18 +57,18 @@ func loadPostmortem(dir, filename string) (*Postmortem, error) {
 	return pm, nil
 }
 
-// loadPostmortems parses the postmortem files
+// LoadPostmortems parses the postmortem files
 // and returns a slice with their content.
-func loadPostmortems(dir string) ([]*Postmortem, error) {
+func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("error opening data folder: %w", err)
 	}
 
-	var pms []*Postmortem
+	var pms []*postmortems.Postmortem
 
 	for _, path := range files {
-		pm, err := loadPostmortem(dir, path.Name())
+		pm, err := LoadPostmortem(dir, path.Name())
 		if err != nil {
 			return nil, err
 		}
@@ -94,14 +100,14 @@ func categoriesPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := tmpl.ExecuteTemplate(w, "layout", Categories); err != nil {
+	if err := tmpl.ExecuteTemplate(w, "layout", postmortems.Categories); err != nil {
 		log.Println(err.Error())
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
 	}
 }
 
-func getPosmortemByCategory(pms []*Postmortem, category string) []Postmortem {
-	var ctpm []Postmortem
+func getPosmortemByCategory(pms []*postmortems.Postmortem, category string) []postmortems.Postmortem {
+	var ctpm []postmortems.Postmortem
 
 	for _, pm := range pms {
 		for _, c := range pm.Categories {
@@ -115,9 +121,9 @@ func getPosmortemByCategory(pms []*Postmortem, category string) []Postmortem {
 }
 
 func categoryPageHandler(w http.ResponseWriter, r *http.Request) {
-	ct := mux.Vars(r)["category"]
+	ct := chi.URLParam(r, "category")
 
-	pms, err := loadPostmortems(*dir)
+	pms, err := LoadPostmortems(*dir)
 	if err != nil {
 		log.Println(err.Error())
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
@@ -149,7 +155,7 @@ func categoryPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	page := struct {
 		Category    string
-		Postmortems []Postmortem
+		Postmortems []postmortems.Postmortem
 	}{
 		Category:    ct,
 		Postmortems: ctpm,
@@ -162,9 +168,9 @@ func categoryPageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
-	pmID := mux.Vars(r)["id"]
+	pmID := chi.URLParam(r, "id")
 
-	pm, err := loadPostmortem(*dir, pmID+".md")
+	pm, err := LoadPostmortem(*dir, pmID+".md")
 	if err != nil {
 		log.Println(err.Error())
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
@@ -201,7 +207,7 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	pms, err := loadPostmortems(*dir)
+	pms, err := LoadPostmortems(*dir)
 	if err != nil {
 		log.Println(err.Error())
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)

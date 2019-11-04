@@ -46,7 +46,7 @@ func ExtractPostmortems(dir string) error {
 
 		// Generate a random string to set as UUID.
 		id := guuid.New()
-		pm := Postmortem{UUID: id.String(), Description: scanner.Text()}
+		pm := &Postmortem{UUID: id.String(), Description: scanner.Text()}
 
 		if re.Match(scanner.Bytes()) {
 			body = `---
@@ -65,10 +65,10 @@ product: ""
 {{ .Description }}
 `
 			matches := re.FindStringSubmatch(scanner.Text())
-			pm = Postmortem{UUID: id.String(), URL: matches[2], Company: matches[1], Description: matches[3]}
+			pm = &Postmortem{UUID: id.String(), URL: matches[2], Company: matches[1], Description: matches[3]}
 		}
 
-		err = savePostmortem(pm, body, dir)
+		err = pm.Save(body, dir)
 		if err != nil {
 			return fmt.Errorf("error saving postmortem file: %w", err)
 		}

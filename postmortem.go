@@ -1,7 +1,12 @@
 package postmortems
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gernest/front"
@@ -94,7 +99,7 @@ func GenerateJSON(d string) error {
 
 	fp := filepath.Join(baseDir, "categories.json")
 
-	j, err := json.Marshal(postmortems.Categories)
+	j, err := json.Marshal(Categories)
 	if err != nil {
 		return err
 	}
