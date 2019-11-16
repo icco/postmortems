@@ -33,6 +33,7 @@ var (
 		"cloud",
 		"config-change",
 		"postmortem",
+		"hardware",
 		"security",
 		"time",
 		"undescriptive",
