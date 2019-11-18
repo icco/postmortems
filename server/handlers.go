@@ -80,6 +80,7 @@ func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
 	return pms, nil
 }
 
+// renderTemplate renders the template and its respective data.
 func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data interface{}) {
 	lp := filepath.Join("templates", "layout.html")
 	fp := filepath.Join("templates", view)
@@ -111,8 +112,9 @@ func categoriesPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, r, "categories.html", postmortems.Categories)
 }
 
+// getPosmortemByCategory return postmortem by category.
 func getPosmortemByCategory(pms []*postmortems.Postmortem, category string) []postmortems.Postmortem {
-	var ctpm []postmortems.Postmortem
+	ctpm := []postmortems.Postmortem{}
 
 	for _, pm := range pms {
 		for _, c := range pm.Categories {
