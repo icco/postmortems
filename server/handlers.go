@@ -24,9 +24,12 @@ func New(d *string) http.Handler {
 
 	r := chi.NewRouter()
 
+	fs := http.FileServer(http.Dir("static"))
+	r.Handle("/*", fs)
+
 	r.Get("/", indexHandler)
+	r.Get("/about", aboutPageHandler)
 	r.Get("/postmortem/{id}", postmortemPageHandler)
-	r.Get("/categories", categoriesPageHandler)
 	r.Get("/category/{category}", categoryPageHandler)
 	r.Get("/healthz", healthzHandler)
 
@@ -108,10 +111,6 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data in
 	}
 }
 
-func categoriesPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, r, "categories.html", postmortems.Categories)
-}
-
 // getPosmortemByCategory return postmortem by category.
 func getPosmortemByCategory(pms []*postmortems.Postmortem, category string) []postmortems.Postmortem {
 	ctpm := []postmortems.Postmortem{}
@@ -142,13 +141,25 @@ func categoryPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	page := struct {
 		Category    string
+		Categories  []string
 		Postmortems []postmortems.Postmortem
 	}{
 		Category:    ct,
+		Categories:  postmortems.Categories,
 		Postmortems: ctpm,
 	}
 
 	renderTemplate(w, r, "category.html", page)
+}
+
+func aboutPageHandler(w http.ResponseWriter, r *http.Request) {
+	page := struct {
+		Categories []string
+	}{
+		Categories: postmortems.Categories,
+	}
+
+	renderTemplate(w, r, "about.html", page)
 }
 
 func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
@@ -164,7 +175,15 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 	htmlDesc := blackfriday.Run([]byte(pm.Description))
 	pm.Description = string(htmlDesc)
 
-	renderTemplate(w, r, "postmortem.html", pm)
+	page := struct {
+		Categories  []string
+		Postmortems []*postmortems.Postmortem
+	}{
+		Categories:  postmortems.Categories,
+		Postmortems: []*postmortems.Postmortem{pm},
+	}
+
+	renderTemplate(w, r, "postmortem.html", page)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -176,5 +195,13 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	renderTemplate(w, r, "index.html", pms)
+	page := struct {
+		Categories  []string
+		Postmortems []*postmortems.Postmortem
+	}{
+		Categories:  postmortems.Categories,
+		Postmortems: pms,
+	}
+
+	renderTemplate(w, r, "index.html", page)
 }

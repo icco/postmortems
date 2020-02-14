@@ -27,7 +27,7 @@ type Postmortem struct {
 
 var (
 	// Categories is a whitelist of valid categories that a postmortem can have.
-	Categories = [...]string{
+	Categories = []string{
 		"automation",
 		"cascading-failure",
 		"cloud",
