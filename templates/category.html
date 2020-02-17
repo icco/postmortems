@@ -1,8 +1,9 @@
-{{define "title"}}Category: {{ .Category }}{{end}}
+{{define "title"}}Category {{ .Category }}{{end}}
 
 {{define "body"}}
 <div class="pa4">
   <div class="overflow-auto">
+    <h1 class="f3 f2-m f1-l mw8 center">{{ .Category }}</h1>
     <table class="f6 w-100 mw8 center" cellspacing="0">
       <thead>
         <tr>
