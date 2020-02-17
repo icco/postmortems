@@ -1,10 +1,24 @@
 {{define "title"}}Category: {{ .Category }}{{end}}
 
 {{define "body"}}
-<h3>Category: {{ .Category }}</h3>
-<ul>
-    {{ range .Postmortems }}
-    <li><a href="/postmortem/{{ .UUID }}">{{ .Company}}: {{ .UUID }}</a></li>
-    {{end}}
-</ul>
+<div class="pa4">
+  <div class="overflow-auto">
+    <table class="f6 w-100 mw8 center" cellspacing="0">
+      <thead>
+        <tr>
+          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">UUID</th>
+          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">Company</th>
+        </tr>
+      </thead>
+      <tbody class="lh-copy">
+        {{ range .Postmortems }}
+        <tr>
+            <td class="pv3 pr3 bb b--black-20"><a href="/postmortem/{{ .UUID }}">{{ .UUID }}</a></td>
+            <td class="pv3 pr3 bb b--black-20">{{ .Company }}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
 {{end}}
