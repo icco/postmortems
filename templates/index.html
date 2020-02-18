@@ -14,13 +14,13 @@
       <tbody class="lh-copy">
         {{ range .Postmortems }}
         <tr>
-            <td class="pv3 pr3 bb b--black-20"><a href="/postmortem/{{ .UUID }}">{{ .UUID }}</a></td>
-            <td class="pv3 pr3 bb b--black-20">{{ .Company }}</td>
-            <td class="pv3 pr3 bb b--black-20">
+          <td class="pv3 pr3 bb b--black-20"><a href="/postmortem/{{ .UUID }}">{{ .UUID }}</a></td>
+          <td class="pv3 pr3 bb b--black-20">{{ .Company }}</td>
+          <td class="pv3 pr3 bb b--black-20">
             {{ range .Categories }}
-                <a href="/category/{{ . }}">{{ . }}</a>
+            <a href="/category/{{ . }}">{{ . }}</a>
             {{end}}
-            </td>
+          </td>
 
         </tr>
         {{end}}
