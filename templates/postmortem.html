@@ -1,7 +1,7 @@
 {{define "title"}}Postmortem{{end}}
 
 {{define "body"}}
-<div class="pa5 pa5-ns w-100 mw8 center">
+<article class="pa3 pa5-ns mw8 center">
   {{ range .Postmortems }}
   <h1 class="f3 f2-m f1-l">{{ .Company }}</h1>
   <ul>
@@ -10,10 +10,11 @@
     {{end}}
   </ul>
 
-  <p class="measure lh-copy">
-   {{ .Description }}
+  <p class="lh-copy">
+    {{ .Description }}
   </p>
-  <small><a href="{{ .URL }}">Source</a>, <a href="https://github.com/icco/postmortems/blob/master/data/{{ .UUID }}.md">Edit Metadata</a> </small>
+  <small><a href="{{ .URL }}">Source</a>, <a
+      href="https://github.com/icco/postmortems/blob/master/data/{{ .UUID }}.md">Edit Metadata</a> </small>
   {{ end }}
-</div>
+</article>
 {{end}}
