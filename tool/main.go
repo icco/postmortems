@@ -71,7 +71,7 @@ func main() {
   case "new":
    err = newPostmortem(*dir)
 	case "validate":
-		err = postmortems.ValidateDir(*dir)
+		_, err = postmortems.ValidateDir(*dir)
 	case "serve":
 		err = Serve()
 	default:
