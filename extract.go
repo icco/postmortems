@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	re        = regexp.MustCompile(`^\[(.+?)\]\((.+?)\)\. (.+)$`)
-	bodyTempl = `---
+	re       = regexp.MustCompile(`^\[(.+?)\]\((.+?)\)\. (.+)$`)
+	bodyTmpl = `---
 {{ yaml . }}
 ---
 
@@ -55,7 +55,7 @@ func ExtractPostmortems(dir string) error {
 			}
 		}
 
-		err = pm.Save(body, dir)
+		err = pm.Save(dir)
 		if err != nil {
 			return fmt.Errorf("error saving postmortem file: %w", err)
 		}
@@ -84,8 +84,7 @@ func (pm *Postmortem) Save(dir string) error {
 	}
 
 	// Write postmortem data from memory to file.
-	err := ioutil.WriteFile(filepath.Join(dir, pm.UUID+".md"), data.Bytes(), 0644)
-	if err != nil {
+	if err := ioutil.WriteFile(filepath.Join(dir, pm.UUID+".md"), data.Bytes(), 0644); err != nil {
 		return fmt.Errorf("error writing file: %w", err)
 	}
 

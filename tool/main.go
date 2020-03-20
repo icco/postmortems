@@ -90,4 +90,5 @@ func usage() {
 
 func newPostmortem(dir string) error {
 
+  return nil
 }
