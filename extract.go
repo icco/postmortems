@@ -34,6 +34,11 @@ product: ""
 // ExtractPostmortems reads the collection of postmortems
 // and extracts each postmortem to a separate file.
 func ExtractPostmortems(dir string) error {
+	posts, err := ValidateDir(dir)
+	if err != nil {
+		return err
+	}
+
 	file, err := os.Open("./tmp/posts.md")
 	if err != nil {
 		return fmt.Errorf("error opening file: %w", err)
@@ -66,6 +71,13 @@ product: ""
 `
 			matches := re.FindStringSubmatch(scanner.Text())
 			pm = &Postmortem{UUID: id.String(), URL: matches[2], Company: matches[1], Description: matches[3]}
+		}
+
+		// See if there is an existing one.
+		for _, existing := range posts {
+			if existing.URL == pm.URL {
+				pm.UUID = existing.UUID
+			}
 		}
 
 		err = pm.Save(body, dir)

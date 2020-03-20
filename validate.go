@@ -8,56 +8,64 @@ import (
 )
 
 // ValidateDir takes a directory path and validates every file in there.
-func ValidateDir(d string) error {
-	return filepath.Walk(d, func(path string, info os.FileInfo, err error) error {
+func ValidateDir(d string) ([]*Postmortem, error) {
+	var ret []*Postmortem
+	err := filepath.Walk(d, func(path string, info os.FileInfo, err error) error {
 		// Failed to open path
 		if err != nil {
 			return err
 		}
 
 		if !info.IsDir() {
-			err = ValidateFile(path)
+			p, err := ValidateFile(path)
 			if err != nil {
 				return err
 			}
+			ret = append(ret, p)
 		}
 
 		return nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, err
 }
 
 // ValidateFile takes a file path and validates just that file.
-func ValidateFile(filename string) error {
+func ValidateFile(filename string) (*Postmortem, error) {
 	f, err := os.Open(filename)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	p, err := Parse(f)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if p.URL == "" {
-		return fmt.Errorf("%s: url is empty", filename)
+		return nil, fmt.Errorf("%s: url is empty", filename)
 	}
 
 	_, err = url.Parse(p.URL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, cat := range p.Categories {
 		if !CategoriesContain(cat) {
-			return fmt.Errorf("%s: %s is not a valid category", filename, cat)
+			return nil, fmt.Errorf("%s: %s is not a valid category", filename, cat)
 		}
 	}
 
 	if p.Description == "" {
-		return fmt.Errorf("%s: description is empty", filename)
+		return nil, fmt.Errorf("%s: description is empty", filename)
 	}
 
-	return nil
+	return p, nil
 }
 
 // CategoriesContain takes a string and decides

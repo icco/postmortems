@@ -56,7 +56,7 @@ func main() {
 	case "generate":
 		err = postmortems.GenerateJSON(*dir)
 	case "validate":
-		err = postmortems.ValidateDir(*dir)
+		_, err = postmortems.ValidateDir(*dir)
 	case "serve":
 		err = Serve()
 	default:
