@@ -2,13 +2,9 @@ package postmortems
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"regexp"
-	"text/template"
 
 	guuid "github.com/google/uuid"
 )
@@ -39,19 +35,24 @@ func ExtractPostmortems(dir string) error {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		// Generate a random string to set as UUID.
 		id := guuid.New()
-		pm := &Postmortem{UUID: id.String(), Description: scanner.Text()}
+		pm := &Postmortem{UUID: id.String()}
 
 		if re.Match(scanner.Bytes()) {
 			matches := re.FindStringSubmatch(scanner.Text())
-			pm = &Postmortem{UUID: id.String(), URL: matches[2], Company: matches[1], Description: matches[3]}
+			pm.UUID = id.String()
+			pm.URL = matches[2]
+			pm.Company = matches[1]
+			pm.Description = matches[3]
+			pm.Categories = []string{"postmortem"}
 		}
 
 		// See if there is an existing one.
 		for _, existing := range posts {
 			if existing.URL == pm.URL {
 				pm.UUID = existing.UUID
+				pm.Categories = existing.Categories
+				pm.Product = existing.Product
 			}
 		}
 
@@ -63,29 +64,6 @@ func ExtractPostmortems(dir string) error {
 
 	if err := scanner.Err(); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// Save takes the in-memory representation of the postmortem file and stores it
-// in a file.
-func (pm *Postmortem) Save(dir string) error {
-	var data bytes.Buffer
-
-	fm, err := template.New("PostmortemTemplate").Parse(bodyTmpl)
-	if err != nil {
-		return nil
-	}
-	fm = fm.Funcs(template.FuncMap{"yaml": ToYaml})
-
-	if err := fm.Execute(&data, pm); err != nil {
-		return fmt.Errorf("error executing template: %w", err)
-	}
-
-	// Write postmortem data from memory to file.
-	if err := ioutil.WriteFile(filepath.Join(dir, pm.UUID+".md"), data.Bytes(), 0644); err != nil {
-		return fmt.Errorf("error writing file: %w", err)
 	}
 
 	return nil
