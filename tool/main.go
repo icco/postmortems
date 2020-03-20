@@ -16,6 +16,19 @@ var (
 	dir    = flag.String("dir", "./data/", "")
 )
 
+const usageText = `pm [options...]
+Options:
+-action     The action we should take. The three valid options are extract, generate & validate.
+-dir        The directory with Markdown files for to extract or parse. Defaults to ./data
+
+Actions:
+extract     Extract postmortems from the collection and create separate files.
+generate    Generate JSON files from the postmortem Markdown files.
+new         Create a new postmortem file.
+validate    Validate the postmortem files in the directory.
+serve       Serve the postmortem files in a small website.
+`
+
 // Serve serves the content of the website.
 func Serve() error {
 	router := server.New(dir)
@@ -55,6 +68,8 @@ func main() {
 		err = postmortems.ExtractPostmortems(*dir)
 	case "generate":
 		err = postmortems.GenerateJSON(*dir)
+  case "new":
+   err = newPostmortem(*dir)
 	case "validate":
 		err = postmortems.ValidateDir(*dir)
 	case "serve":
@@ -73,14 +88,6 @@ func usage() {
 	os.Exit(0)
 }
 
-var usageText = `pm [options...]
-Options:
--action     The action we should take. The three valid options are extract, generate & validate.
--dir        The directory with Markdown files for to extract or parse. Defaults to ./data
+func newPostmortem(dir string) error {
 
-Actions:
-extract     Extract postmortems from the collection and create separate files.
-generate    Generate JSON files from the postmortem Markdown files.
-validate    Validate the postmortem files in the directory.
-serve       Serve the postmortem files in a small website.
-`
+}
