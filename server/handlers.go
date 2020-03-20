@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/icco/postmortems"
-	blackfriday "gopkg.in/russross/blackfriday.v2"
+	"github.com/russross/blackfriday/v2"
 )
 
 var (
