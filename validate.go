@@ -17,7 +17,7 @@ func ValidateDir(d string) ([]*Postmortem, error) {
 		}
 
 		if !info.IsDir() {
-			p, err = ValidateFile(path)
+			p, err := ValidateFile(path)
 			if err != nil {
 				return err
 			}
