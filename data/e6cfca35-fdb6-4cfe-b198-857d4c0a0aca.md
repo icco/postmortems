@@ -1,12 +1,9 @@
 ---
-
-uuid: "e6cfca35-fdb6-4cfe-b198-857d4c0a0aca"
-url: "https://www.businessinsider.com.au/a-fire-in-a-telstra-exchange-is-causing-flight-delays-and-network-outages-2017-2"
-start_time: ""
-end_time: ""
+uuid: e6cfca35-fdb6-4cfe-b198-857d4c0a0aca
+url: https://www.businessinsider.com.au/a-fire-in-a-telstra-exchange-is-causing-flight-delays-and-network-outages-2017-2
 categories:
 - postmortem
-company: "Telstra"
+company: Telstra
 product: ""
 
 ---

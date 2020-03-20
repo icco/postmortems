@@ -1,12 +1,9 @@
 ---
-
-uuid: "7e14860a-fced-4a66-9fdf-40f702ceeccd"
-url: "https://status.heroku.com/incidents/642?postmortem"
-start_time: ""
-end_time: ""
+uuid: 7e14860a-fced-4a66-9fdf-40f702ceeccd
+url: https://status.heroku.com/incidents/642?postmortem
 categories:
 - postmortem
-company: "Heroku"
+company: Heroku
 product: ""
 
 ---
