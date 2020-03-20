@@ -13,23 +13,15 @@ import (
 	guuid "github.com/google/uuid"
 )
 
-var re = regexp.MustCompile(`^\[(.+?)\]\((.+?)\)\. (.+)$`)
-
-var defaultBody = `---
-
-uuid: "{{ .UUID }}"
-url: ""
-start_time: ""
-end_time: ""
-categories:
-- postmortem
-company: ""
-product: ""
-
+var (
+	re        = regexp.MustCompile(`^\[(.+?)\]\((.+?)\)\. (.+)$`)
+	bodyTempl = `---
+{{ yaml . }}
 ---
 
-{{ .Data }}
+{{ .Description }}
 `
+)
 
 // ExtractPostmortems reads the collection of postmortems
 // and extracts each postmortem to a separate file.
@@ -47,28 +39,11 @@ func ExtractPostmortems(dir string) error {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		body := defaultBody
-
 		// Generate a random string to set as UUID.
 		id := guuid.New()
 		pm := &Postmortem{UUID: id.String(), Description: scanner.Text()}
 
 		if re.Match(scanner.Bytes()) {
-			body = `---
-
-uuid: "{{ .UUID }}"
-url: "{{ .URL }}"
-start_time: ""
-end_time: ""
-categories:
-- postmortem
-company: "{{ .Company }}"
-product: ""
-
----
-
-{{ .Description }}
-`
 			matches := re.FindStringSubmatch(scanner.Text())
 			pm = &Postmortem{UUID: id.String(), URL: matches[2], Company: matches[1], Description: matches[3]}
 		}
@@ -95,10 +70,15 @@ product: ""
 
 // Save takes the in-memory representation of the postmortem file and stores it
 // in a file.
-func (pm *Postmortem) Save(body, dir string) error {
+func (pm *Postmortem) Save(dir string) error {
 	var data bytes.Buffer
 
-	fm := template.Must(template.New("newPostmortemTemplate").Parse(body))
+	fm, err := template.New("PostmortemTemplate").Parse(bodyTmpl)
+	if err != nil {
+		return nil
+	}
+	fm = fm.Funcs(template.FuncMap{"yaml": ToYaml})
+
 	if err := fm.Execute(&data, pm); err != nil {
 		return fmt.Errorf("error executing template: %w", err)
 	}

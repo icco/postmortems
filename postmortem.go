@@ -10,19 +10,20 @@ import (
 	"time"
 
 	"github.com/gernest/front"
+	"github.com/goccy/go-yaml"
 )
 
 // Postmortem is a structural representation of a postmortem summary and its
 // metadata.
 type Postmortem struct {
-	UUID        string
-	URL         string
-	StartTime   time.Time
-	EndTime     time.Time
-	Categories  []string
-	Company     string
-	Product     string
-	Description string
+	UUID        string    `yaml:"uuid"`
+	URL         string    `yaml:"url"`
+	StartTime   time.Time `yaml:"start_time"`
+	EndTime     time.Time `yaml:"end_time"`
+	Categories  []string  `yaml:"categories"`
+	Company     string    `yaml:"company"`
+	Product     string    `yaml:"product"`
+	Description string    `yaml:"-"`
 }
 
 var (
@@ -144,4 +145,9 @@ func GenerateJSON(d string) error {
 
 		return nil
 	})
+}
+
+func ToYaml(pm *Postmortem) (string, error) {
+	bytes, err := yaml.Marshal(pm)
+	return string(bytes), err
 }
