@@ -7,14 +7,45 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/icco/postmortems"
 	"github.com/icco/postmortems/server"
-	"github.com/tcnksm/go-input"
 )
 
 var (
 	action = flag.String("action", "", "")
 	dir    = flag.String("dir", "./data/", "")
+	qs     = []*survey.Question{
+		{
+			Name:     "url",
+			Prompt:   &survey.Input{Message: "URL of Postmortem?"},
+			Validate: survey.Required,
+		},
+		{
+			Name:      "company",
+			Prompt:    &survey.Input{Message: "Company?"},
+			Validate:  survey.Required,
+			Transform: survey.Title,
+		},
+		{
+			Name:     "description",
+			Prompt:   &survey.Multiline{Message: "Short summary?"},
+			Validate: survey.Required,
+		},
+		{
+			Name:   "product",
+			Prompt: &survey.Input{Message: "Product?"},
+		},
+		{
+			Name: "categories",
+			Prompt: &survey.MultiSelect{
+				Message: "Choose a color:",
+				Options: postmortems.Categories,
+				Default: "postmortem",
+			},
+		},
+	}
 )
 
 const usageText = `pm [options...]
@@ -90,26 +121,14 @@ func usage() {
 }
 
 func newPostmortem(dir string) error {
-	ui := input.DefaultUI()
-	url, err := ui.Ask("URL?", &input.Options{})
-	if err != nil {
-		return err
-	}
-
-	desc, err := ui.Ask("Description?", &input.Options{})
-	if err != nil {
-		return err
-	}
-
-	cats, err := ui.Select("Categories?", postmortems.Categories, &input.Options{})
-	if err != nil {
-		return err
-	}
-
 	pm := postmortems.New()
-	pm.Description = desc
-	pm.URL = url
-	pm.Categories = []string{cats}
+	err := survey.Ask(qs, &pm)
+	if err == terminal.InterruptErr {
+		fmt.Println("interrupted")
+		os.Exit(0)
+	} else if err != nil {
+		return fmt.Errorf("couldn't ask question: %w", err)
+	}
 
 	return pm.Save(dir)
 }

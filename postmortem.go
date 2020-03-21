@@ -183,7 +183,7 @@ func (pm *Postmortem) Save(dir string) error {
 	if err := ioutil.WriteFile(filepath.Join(dir, pm.UUID+".md"), data.Bytes(), 0644); err != nil {
 		return fmt.Errorf("error writing file: %w", err)
 	}
-	log.Printf("saved %+v to %+v", pm, data)
 
+	log.Printf("saved %+v to %+v", pm, data.String())
 	return nil
 }
