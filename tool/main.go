@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -20,7 +21,7 @@ var (
 		{
 			Name:     "url",
 			Prompt:   &survey.Input{Message: "URL of Postmortem?"},
-			Validate: survey.Required,
+			Validate: survey.ComposeValidators(survey.Required, IsURL()),
 		},
 		{
 			Name:      "company",
@@ -30,7 +31,7 @@ var (
 		},
 		{
 			Name:     "description",
-			Prompt:   &survey.Multiline{Message: "Short summary?"},
+			Prompt:   &survey.Multiline{Message: "Short summary (in markdown):"},
 			Validate: survey.Required,
 		},
 		{
@@ -40,9 +41,10 @@ var (
 		{
 			Name: "categories",
 			Prompt: &survey.MultiSelect{
-				Message: "Choose a color:",
-				Options: postmortems.Categories,
-				Default: "postmortem",
+				Message:  "Select categories:",
+				Options:  postmortems.Categories,
+				Default:  "postmortem",
+				PageSize: len(postmortems.Categories),
 			},
 		},
 	}
@@ -122,7 +124,7 @@ func usage() {
 
 func newPostmortem(dir string) error {
 	pm := postmortems.New()
-	err := survey.Ask(qs, &pm)
+	err := survey.Ask(qs, pm)
 	if err == terminal.InterruptErr {
 		fmt.Println("interrupted")
 		os.Exit(0)
@@ -131,4 +133,20 @@ func newPostmortem(dir string) error {
 	}
 
 	return pm.Save(dir)
+}
+
+func IsURL() survey.Validator {
+	return func(val interface{}) error {
+		str, ok := val.(string)
+		if !ok {
+			return fmt.Errorf("could not decode string")
+		}
+
+		_, err := url.Parse(str)
+		if err != nil {
+			return fmt.Errorf("value is not a valid URL: %w", err)
+		}
+
+		return nil
+	}
 }
