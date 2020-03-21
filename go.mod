@@ -11,5 +11,6 @@ require (
 	github.com/google/uuid v1.1.1
 	github.com/russross/blackfriday/v2 v2.0.1
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
+	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 )

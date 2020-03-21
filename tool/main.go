@@ -135,6 +135,7 @@ func newPostmortem(dir string) error {
 	return pm.Save(dir)
 }
 
+// IsURL creates a validator that makes sure it's a parsable URL.
 func IsURL() survey.Validator {
 	return func(val interface{}) error {
 		str, ok := val.(string)
