@@ -52,7 +52,7 @@ var (
 
 const usageText = `pm [options...]
 Options:
--action     The action we should take. The three valid options are extract, generate & validate.
+-action     The action we should take.
 -dir        The directory with Markdown files for to extract or parse. Defaults to ./data
 
 Actions:
