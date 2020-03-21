@@ -9,6 +9,7 @@ import (
 
 	"github.com/icco/postmortems"
 	"github.com/icco/postmortems/server"
+	"github.com/tcnksm/go-input"
 )
 
 var (
@@ -68,8 +69,8 @@ func main() {
 		err = postmortems.ExtractPostmortems(*dir)
 	case "generate":
 		err = postmortems.GenerateJSON(*dir)
-  case "new":
-   err = newPostmortem(*dir)
+	case "new":
+		err = newPostmortem(*dir)
 	case "validate":
 		_, err = postmortems.ValidateDir(*dir)
 	case "serve":
@@ -89,6 +90,26 @@ func usage() {
 }
 
 func newPostmortem(dir string) error {
+	ui := input.DefaultUI()
+	url, err := ui.Ask("URL?", &input.Options{})
+	if err != nil {
+		return err
+	}
 
-  return nil
+	desc, err := ui.Ask("Description?", &input.Options{})
+	if err != nil {
+		return err
+	}
+
+	cats, err := ui.Select("Categories?", postmortems.Categories, &input.Options{})
+	if err != nil {
+		return err
+	}
+
+	pm := postmortems.New()
+	pm.Description = desc
+	pm.URL = url
+	pm.Categories = []string{cats}
+
+	return pm.Save(dir)
 }

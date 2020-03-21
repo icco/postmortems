@@ -14,6 +14,7 @@ import (
 
 	"github.com/gernest/front"
 	"github.com/goccy/go-yaml"
+	guuid "github.com/google/uuid"
 )
 
 // Postmortem is a structural representation of a postmortem summary and its
@@ -154,6 +155,12 @@ func GenerateJSON(d string) error {
 func ToYaml(pm *Postmortem) (string, error) {
 	bytes, err := yaml.Marshal(pm)
 	return string(bytes), err
+}
+
+// New generates a new postmortem with a fresh uuid.
+func New() *Postmortem {
+	id := guuid.New()
+	return &Postmortem{UUID: id.String()}
 }
 
 // Save takes the in-memory representation of the postmortem file and stores it
