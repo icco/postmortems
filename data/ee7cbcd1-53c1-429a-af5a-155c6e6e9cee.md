@@ -1,12 +1,9 @@
 ---
-
-uuid: "ee7cbcd1-53c1-429a-af5a-155c6e6e9cee"
-url: "https://medium.com/square-corner-blog/incident-summary-2017-03-16-2f65be39297"
-start_time: ""
-end_time: ""
+uuid: ee7cbcd1-53c1-429a-af5a-155c6e6e9cee
+url: https://medium.com/square-corner-blog/incident-summary-2017-03-16-2f65be39297
 categories:
 - postmortem
-company: "Square"
+company: Square
 product: ""
 
 ---
