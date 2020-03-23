@@ -170,6 +170,7 @@ func (pm *Postmortem) Save(dir string) error {
 
 	fm := template.New("PostmortemTemplate")
 	fm = fm.Funcs(template.FuncMap{"yaml": ToYaml})
+
 	fm, err := fm.Parse(bodyTmpl)
 	if err != nil {
 		return err
@@ -185,5 +186,6 @@ func (pm *Postmortem) Save(dir string) error {
 	}
 
 	log.Printf("saved %+v to %+v", pm, data.String())
+
 	return nil
 }

@@ -8,6 +8,8 @@ This repo means to create a public repository of postmortems with annotated meta
 
 If you'd like to contribute, either edit a postmortem file in the data folder, or try to fix an issue.
 
+If you want further process the postmortem metadata files locally, we have a [folder](https://postmortems.app/output/) with all the metadata in JSON format. Please let us know your findings.
+
 ## Tool
 
 ```
@@ -28,3 +30,5 @@ serve       Serve the postmortem files in a small website.
 ## Shoutouts
 
  - @dastergon for fixing a bunch of bugs, porting hacky Ruby code to Go, and implementing webserver!
+
+If you would like to find postmortem templates from various companies, you can check at the [postmortem-templates](https://github.com/dastergon/postmortem-templates) repository on Github .

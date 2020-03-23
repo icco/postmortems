@@ -27,9 +27,12 @@ func New(d *string) http.Handler {
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/*", fs)
 
+	r.Handle("/output/", http.StripPrefix("/output/", http.FileServer(http.Dir("./output"))))
+
 	r.Get("/", indexHandler)
 	r.Get("/about", aboutPageHandler)
 	r.Get("/postmortem/{id}", postmortemPageHandler)
+	r.Get("/postmortem/{id}.json", postmortemJSONPageHandler)
 	r.Get("/category/{category}", categoryPageHandler)
 	r.Get("/healthz", healthzHandler)
 
@@ -184,6 +187,25 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	renderTemplate(w, r, "postmortem.html", page)
+}
+
+func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
+	pmID := chi.URLParam(r, "id")
+
+	jsonPM := pmID + ".json"
+
+	data, err := ioutil.ReadFile(filepath.Join("output/", jsonPM))
+	if err != nil {
+		log.Println(err.Error())
+		http.Error(w, http.StatusText(404), http.StatusNotFound)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+
+	if _, err := w.Write(data); err != nil {
+		log.Printf("Error writing response to postmortem JSON request")
+	}
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {

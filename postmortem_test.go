@@ -48,7 +48,6 @@ func TestParse(t *testing.T) {
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("Parse() returned unexpected results (-got +want):\n%s", diff)
 			}
-
 		})
 	}
 }

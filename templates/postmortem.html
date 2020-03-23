@@ -13,8 +13,11 @@
   <p class="lh-copy">
     {{ .Description }}
   </p>
-  <small><a href="{{ .URL }}">Source</a>, <a
-      href="https://github.com/icco/postmortems/blob/master/data/{{ .UUID }}.md">Edit Metadata</a> </small>
+  <small>
+      <a href="{{ .URL }}">Source</a> |
+      <a href="https://github.com/icco/postmortems/blob/master/data/{{ .UUID }}.md">Edit Metadata</a> |
+      <a href="{{ .UUID }}.json">JSON file</a>
+  </small>
   {{ end }}
 </article>
 {{end}}
