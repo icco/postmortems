@@ -124,6 +124,7 @@ func usage() {
 
 func newPostmortem(dir string) error {
 	pm := postmortems.New()
+
 	err := survey.Ask(qs, pm)
 	if err == terminal.InterruptErr {
 		fmt.Println("interrupted")

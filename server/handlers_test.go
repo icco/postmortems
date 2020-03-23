@@ -91,7 +91,6 @@ func TestLoadPostmortem(t *testing.T) {
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("LoadPostmortem() returned unexpected results (-got +want):\n%s", diff)
 			}
-
 		})
 	}
 }
@@ -137,7 +136,6 @@ func TestLoadPostmortems(t *testing.T) {
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("LoadPostmortems() returned unexpected results (-got +want):\n%s", diff)
 			}
-
 		})
 	}
 }
