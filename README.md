@@ -31,4 +31,4 @@ serve       Serve the postmortem files in a small website.
 
  - @dastergon for fixing a bunch of bugs, porting hacky Ruby code to Go, and implementing webserver!
 
-If you would like to find postmortem templates from various companies, you can check on Github at the [postmortem-templates](https://github.com/dastergon/postmortem-templates) repository.
+If you would like to find postmortem templates from various companies, you can check at the [postmortem-templates](https://github.com/dastergon/postmortem-templates) repository on Github .
