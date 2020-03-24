@@ -177,6 +177,8 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err.Error())
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+
+		return
 	}
 
 	// Convert Markdown formatting of descriptions to HTML.
