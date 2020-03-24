@@ -1,6 +1,7 @@
 package server
 
 import (
+	"compress/flate"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 	"github.com/icco/postmortems"
 	"github.com/russross/blackfriday/v2"
 )
@@ -23,6 +25,9 @@ func New(d *string) http.Handler {
 	dir = d
 
 	r := chi.NewRouter()
+
+	compressor := middleware.NewCompressor(flate.DefaultCompression)
+	r.Use(compressor.Handler())
 
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/*", fs)
@@ -172,6 +177,8 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err.Error())
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+
+		return
 	}
 
 	// Convert Markdown formatting of descriptions to HTML.
