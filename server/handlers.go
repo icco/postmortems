@@ -32,7 +32,7 @@ func New(d *string) http.Handler {
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/*", fs)
 
-	r.Handle("/output/", http.StripPrefix("/output/", http.FileServer(http.Dir("./output"))))
+	r.Handle("/output/*", http.StripPrefix("/output/", http.FileServer(http.Dir("./output"))))
 
 	r.Get("/", indexHandler)
 	r.Get("/about", aboutPageHandler)
