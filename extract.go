@@ -41,7 +41,7 @@ func ExtractPostmortems(loc string, dir string) error {
 
 		data, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("could not read response body: %w", loc, err)
+			return fmt.Errorf("could not read response body: %w", err)
 		}
 	} else if isFile(loc) {
 		data, err = ioutil.ReadFile(loc)
