@@ -2,7 +2,11 @@ package postmortems
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 
@@ -21,19 +25,34 @@ var (
 
 // ExtractPostmortems reads the collection of postmortems
 // and extracts each postmortem to a separate file.
-func ExtractPostmortems(dir string) error {
+func ExtractPostmortems(loc string, dir string) error {
 	posts, err := ValidateDir(dir)
 	if err != nil {
 		return err
 	}
 
-	file, err := os.Open("./tmp/posts.md")
-	if err != nil {
-		return fmt.Errorf("error opening file: %w", err)
-	}
-	defer file.Close()
+	var data []byte
+	if isURL(loc) {
+		resp, err := http.Get(loc)
+		if err != nil {
+			return fmt.Errorf("could not get %q: %w", loc, err)
+		}
+		defer resp.Body.Close()
 
-	scanner := bufio.NewScanner(file)
+		data, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("could not read response body: %w", err)
+		}
+	} else if isFile(loc) {
+		data, err = ioutil.ReadFile(loc)
+		if err != nil {
+			return fmt.Errorf("error opening file %q: %w", loc, err)
+		}
+	} else {
+		return fmt.Errorf("%q is not a file or a url", loc)
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		id := guuid.New()
 		pm := &Postmortem{UUID: id.String()}
@@ -56,9 +75,10 @@ func ExtractPostmortems(dir string) error {
 			}
 		}
 
-		err = pm.Save(dir)
-		if err != nil {
-			return fmt.Errorf("error saving postmortem file: %w", err)
+		if pm.URL != "" && pm.Company != "" && pm.Description != "" {
+			if err := pm.Save(dir); err != nil {
+				return fmt.Errorf("error saving postmortem file: %w", err)
+			}
 		}
 	}
 
@@ -67,4 +87,21 @@ func ExtractPostmortems(dir string) error {
 	}
 
 	return nil
+}
+
+func isURL(tgt string) bool {
+	u, err := url.Parse(tgt)
+	if err != nil {
+		return false
+	}
+
+	return u.IsAbs() && u.Hostname() != ""
+}
+
+func isFile(tgt string) bool {
+	info, err := os.Stat(tgt)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }
