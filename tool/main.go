@@ -100,9 +100,9 @@ func main() {
 
 	switch *action {
 	case "extract":
-		err = postmortems.ExtractPostmortems(*dir)
+		err = postmortems.ExtractPostmortems("./tmp/posts.md", *dir)
 	case "danluu":
-		err = postmortems.ExtractPostmortems("https://raw.githubusercontent.com/danluu/post-mortems/master/README.md")
+		err = postmortems.ExtractPostmortems("https://raw.githubusercontent.com/danluu/post-mortems/master/README.md", *dir)
 	case "generate":
 		err = postmortems.GenerateJSON(*dir)
 	case "new":
