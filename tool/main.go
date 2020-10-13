@@ -57,6 +57,7 @@ Options:
 
 Actions:
 extract     Extract postmortems from the collection and create separate files.
+danluu      Download and extract postmortems from https://github.com/danluu/post-mortems.
 generate    Generate JSON files from the postmortem Markdown files.
 new         Create a new postmortem file.
 validate    Validate the postmortem files in the directory.
@@ -100,6 +101,8 @@ func main() {
 	switch *action {
 	case "extract":
 		err = postmortems.ExtractPostmortems(*dir)
+	case "danluu":
+		err = postmortems.ExtractPostmortems("https://raw.githubusercontent.com/danluu/post-mortems/master/README.md")
 	case "generate":
 		err = postmortems.GenerateJSON(*dir)
 	case "new":
