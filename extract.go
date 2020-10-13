@@ -75,9 +75,10 @@ func ExtractPostmortems(loc string, dir string) error {
 			}
 		}
 
-		err = pm.Save(dir)
-		if err != nil {
-			return fmt.Errorf("error saving postmortem file: %w", err)
+		if pm.URL != "" && pm.Company != "" && pm.Description != "" {
+			if err := pm.Save(dir); err != nil {
+				return fmt.Errorf("error saving postmortem file: %w", err)
+			}
 		}
 	}
 
