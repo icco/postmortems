@@ -27,7 +27,7 @@ func New(d *string) http.Handler {
 	r := chi.NewRouter()
 
 	compressor := middleware.NewCompressor(flate.DefaultCompression)
-	r.Use(compressor.Handler())
+	r.Use(compressor.Handler)
 
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/*", fs)
