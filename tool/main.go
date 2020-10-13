@@ -50,19 +50,23 @@ var (
 	}
 )
 
-const usageText = `pm [options...]
+const (
+	usageText = `pm [options...]
 Options:
 -action     The action we should take.
 -dir        The directory with Markdown files for to extract or parse. Defaults to ./data
 
 Actions:
-extract     Extract postmortems from the collection and create separate files.
-danluu      Download and extract postmortems from https://github.com/danluu/post-mortems.
-generate    Generate JSON files from the postmortem Markdown files.
-new         Create a new postmortem file.
-validate    Validate the postmortem files in the directory.
-serve       Serve the postmortem files in a small website.
+extract         Extract postmortems from the collection and create separate files.
+upstream-fetch  Download and extract postmortems from https://github.com/danluu/post-mortems.
+generate        Generate JSON files from the postmortem Markdown files.
+new             Create a new postmortem file.
+validate        Validate the postmortem files in the directory.
+serve           Serve the postmortem files in a small website.
 `
+	danluuReadme = "https://raw.githubusercontent.com/danluu/post-mortems/master/README.md"
+	extractFile  = "./tmp/posts.md"
+)
 
 // Serve serves the content of the website.
 func Serve() error {
@@ -100,9 +104,9 @@ func main() {
 
 	switch *action {
 	case "extract":
-		err = postmortems.ExtractPostmortems("./tmp/posts.md", *dir)
-	case "danluu":
-		err = postmortems.ExtractPostmortems("https://raw.githubusercontent.com/danluu/post-mortems/master/README.md", *dir)
+		err = postmortems.ExtractPostmortems(extractFile, *dir)
+	case "upstream-fetch":
+		err = postmortems.ExtractPostmortems(danluuReadme, *dir)
 	case "generate":
 		err = postmortems.GenerateJSON(*dir)
 	case "new":
