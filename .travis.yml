@@ -7,7 +7,7 @@ env:
 
 script:
 - go test -v -race -cover ./tool
-- go vet ./tool
-- go run golang.org/x/lint/golint -set_exit_status ./tool
-- go run github.com/fzipp/gocyclo -avg ./tool
+- go vet ./...
+- go run golang.org/x/lint/golint -set_exit_status ./...
+- go run github.com/fzipp/gocyclo/cmd/gocyclo -avg ./tool
 - cd tool && go run . -action=validate -dir=../data/
