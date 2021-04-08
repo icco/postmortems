@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/icco/postmortems"
 	"github.com/russross/blackfriday/v2"
 )
