@@ -1,13 +1,18 @@
+# https://docs.travis-ci.com/user/languages/go
 language: go
-
+sudo: false
 go:
-- "1.15"
+  - "1.16"
 env:
-  GO111MODULE: "on"
-
+  - GO111MODULE=on
 script:
-- go test -v -race -cover ./tool
-- go vet ./...
-- go run golang.org/x/lint/golint -set_exit_status ./...
-- go run github.com/fzipp/gocyclo/cmd/gocyclo -avg ./tool
-- cd tool && go run . -action=validate -dir=../data/
+  - go test -v -cover ./...
+  - go vet ./...
+  - go get -v -u -d golang.org/x/lint/golint
+  - go run golang.org/x/lint/golint -set_exit_status ./...
+  - go get -v -u -d github.com/fzipp/gocyclo/cmd/gocyclo
+  - go run github.com/fzipp/gocyclo/cmd/gocyclo -avg .
+notifications:
+  email:
+    on_success: change
+    on_failure: change
