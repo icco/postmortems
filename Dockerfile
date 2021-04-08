@@ -1,4 +1,4 @@
-FROM golang:1.15-alpine as builder
+FROM golang:1.16-alpine as builder
 
 ENV GOPROXY="https://proxy.golang.org"
 ENV GO111MODULE="on"
@@ -8,7 +8,7 @@ RUN apk add --no-cache git
 WORKDIR /go/src/github.com/icco/postmortems
 COPY . .
 
-RUN cd tool && go build -o /go/bin/pm .
+RUN go build -o /go/bin/pm ./tool
 RUN /go/bin/pm -action=validate
 RUN /go/bin/pm -action=generate
 CMD /go/bin/pm -action=serve
