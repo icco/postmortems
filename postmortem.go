@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -15,6 +14,7 @@ import (
 	"github.com/gernest/front"
 	"github.com/goccy/go-yaml"
 	guuid "github.com/google/uuid"
+	"github.com/icco/gutil/logging"
 )
 
 // Postmortem is a structural representation of a postmortem summary and its
@@ -43,6 +43,7 @@ var (
 		"time",
 		"undescriptive",
 	}
+	log = logging.Must(logging.NewLogger(postmortems.Service))
 )
 
 // Parse turns an io stream into a Postmortem type.
@@ -185,7 +186,7 @@ func (pm *Postmortem) Save(dir string) error {
 		return fmt.Errorf("error writing file: %w", err)
 	}
 
-	log.Printf("saved %+v to %+v", pm, data.String())
+	log.Debugw("saved pm", "pm", pm, "data", data.String())
 
 	return nil
 }

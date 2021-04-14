@@ -4,7 +4,6 @@ import (
 	"compress/flate"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,12 +11,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/icco/gutil/logging"
 	"github.com/icco/postmortems"
 	"github.com/russross/blackfriday/v2"
+	"go.uber.org/zap"
 )
 
 var (
 	dir *string
+	log = logging.Must(logging.NewLogger(postmortems.Service))
 )
 
 // New creates a new HTTP routing handler.
@@ -25,6 +27,8 @@ func New(d *string) http.Handler {
 	dir = d
 
 	r := chi.NewRouter()
+	r.Use(middleware.RealIP)
+	r.Use(logging.Middleware(log.Desugar(), postmortems.GCPProject))
 
 	compressor := middleware.NewCompressor(flate.DefaultCompression)
 	r.Use(compressor.Handler)
@@ -50,7 +54,7 @@ func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 
 	if _, err := w.Write([]byte("ok.")); err != nil {
-		log.Printf("Error writing response to healthz request")
+		log.Errorw("error writing response to healthz request", zap.Error(err))
 	}
 }
 
@@ -107,14 +111,14 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data in
 
 	tmpl, err := template.ParseFiles(lp, fp)
 	if err != nil {
-		log.Println(err.Error())
+		log.Errorw("template parse error", zap.Error(err))
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
 
 		return
 	}
 
 	if err := tmpl.ExecuteTemplate(w, "layout", data); err != nil {
-		log.Println(err.Error())
+		log.Errorw("template execute error", zap.Error(err))
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
 	}
 }
@@ -139,7 +143,7 @@ func categoryPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	pms, err := LoadPostmortems(*dir)
 	if err != nil {
-		log.Println(err.Error())
+		log.Errorw("load postmortems", zap.Error(err))
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
 
 		return
@@ -175,7 +179,7 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	pm, err := LoadPostmortem(*dir, pmID+".md")
 	if err != nil {
-		log.Println(err.Error())
+		log.Errorw("load postmortem", "pmid", pmID, zap.Error(err))
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
 
 		return
@@ -203,7 +207,7 @@ func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	data, err := ioutil.ReadFile(filepath.Join("output/", jsonPM))
 	if err != nil {
-		log.Println(err.Error())
+		log.Errorw("load postmortem json", "pmid", pmID, zap.Error(err))
 		http.Error(w, http.StatusText(404), http.StatusNotFound)
 	}
 
@@ -211,14 +215,14 @@ func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if _, err := w.Write(data); err != nil {
-		log.Printf("Error writing response to postmortem JSON request")
+		log.Errorw("error writing response to postmortem JSON request", zap.Error(err))
 	}
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	pms, err := LoadPostmortems(*dir)
 	if err != nil {
-		log.Println(err.Error())
+		log.Errorw("load postmortems", zap.Error(err))
 		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
 
 		return

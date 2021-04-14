@@ -3,18 +3,20 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/icco/gutil/logging"
 	"github.com/icco/postmortems"
 	"github.com/icco/postmortems/server"
+	"go.uber.org/zap"
 )
 
 var (
+	log    = logging.Must(logging.NewLogger(Service))
 	action = flag.String("action", "", "")
 	dir    = flag.String("dir", "./data/", "")
 	qs     = []*survey.Question{
@@ -66,6 +68,8 @@ serve           Serve the postmortem files in a small website.
 `
 	danluuReadme = "https://raw.githubusercontent.com/danluu/post-mortems/master/README.md"
 	extractFile  = "./tmp/posts.md"
+	Service      = "postmortems"
+	GCPProject   = "icco-cloud"
 )
 
 // Serve serves the content of the website.
@@ -77,7 +81,7 @@ func Serve() error {
 		port = "8080"
 	}
 
-	log.Printf("Server listening on http://0.0.0.0:%s", port)
+	log.Infow("Starting up", "host", fmt.Sprintf("http://localhost:%s", port))
 
 	return http.ListenAndServe(":"+port, router)
 }
@@ -87,14 +91,14 @@ func main() {
 	flag.Parse()
 
 	if action == nil || *action == "" {
-		log.Print("no action specified")
+		log.Warnw("no action specified")
 		usage()
 
 		return
 	}
 
 	if dir == nil || *dir == "" {
-		log.Print("no directory specified")
+		log.Warnw("no directory specified")
 		usage()
 
 		return
@@ -116,11 +120,11 @@ func main() {
 	case "serve":
 		err = Serve()
 	default:
-		log.Fatalf("%s is not a valid action", *action)
+		log.Fatalw("not a valid action", "action", *action)
 	}
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalw("running action failed", zap.Error(err))
 	}
 }
 
