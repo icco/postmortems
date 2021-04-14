@@ -43,7 +43,9 @@ var (
 		"time",
 		"undescriptive",
 	}
-	log = logging.Must(logging.NewLogger(postmortems.Service))
+	log        = logging.Must(logging.NewLogger(Service))
+	Service    = "postmortems"
+	GCPProject = "icco-cloud"
 )
 
 // Parse turns an io stream into a Postmortem type.

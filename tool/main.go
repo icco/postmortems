@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	log    = logging.Must(logging.NewLogger(Service))
+	log    = logging.Must(logging.NewLogger(postmortems.Service))
 	action = flag.String("action", "", "")
 	dir    = flag.String("dir", "./data/", "")
 	qs     = []*survey.Question{
@@ -68,8 +68,6 @@ serve           Serve the postmortem files in a small website.
 `
 	danluuReadme = "https://raw.githubusercontent.com/danluu/post-mortems/master/README.md"
 	extractFile  = "./tmp/posts.md"
-	Service      = "postmortems"
-	GCPProject   = "icco-cloud"
 )
 
 // Serve serves the content of the website.
