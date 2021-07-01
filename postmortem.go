@@ -43,9 +43,14 @@ var (
 		"time",
 		"undescriptive",
 	}
-	log        = logging.Must(logging.NewLogger(Service))
-	Service    = "postmortems"
+
+	// Service defines the service this runs in on GCP.
+	Service = "postmortems"
+
+	// GCPProject defines the project this code runs in and should log to.
 	GCPProject = "icco-cloud"
+
+	log = logging.Must(logging.NewLogger(Service))
 )
 
 // Parse turns an io stream into a Postmortem type.
