@@ -112,14 +112,14 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data in
 	tmpl, err := template.ParseFiles(lp, fp)
 	if err != nil {
 		log.Errorw("template parse error", zap.Error(err))
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 
 		return
 	}
 
 	if err := tmpl.ExecuteTemplate(w, "layout", data); err != nil {
 		log.Errorw("template execute error", zap.Error(err))
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
 
@@ -144,7 +144,7 @@ func categoryPageHandler(w http.ResponseWriter, r *http.Request) {
 	pms, err := LoadPostmortems(*dir)
 	if err != nil {
 		log.Errorw("load postmortems", zap.Error(err))
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 
 		return
 	}
@@ -179,8 +179,8 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	pm, err := LoadPostmortem(*dir, pmID+".md")
 	if err != nil {
-		log.Errorw("load postmortem", "pmid", pmID, zap.Error(err))
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+		log.Warnw("load postmortem", "pmid", pmID, zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 
 		return
 	}
@@ -208,7 +208,7 @@ func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := ioutil.ReadFile(filepath.Join("output/", jsonPM))
 	if err != nil {
 		log.Errorw("load postmortem json", "pmid", pmID, zap.Error(err))
-		http.Error(w, http.StatusText(404), http.StatusNotFound)
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -223,7 +223,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	pms, err := LoadPostmortems(*dir)
 	if err != nil {
 		log.Errorw("load postmortems", zap.Error(err))
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 
 		return
 	}
