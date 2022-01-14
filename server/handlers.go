@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/icco/gutil/logging"
+	"github.com/icco/gutil/otel"
 	"github.com/icco/postmortems"
 	"github.com/russross/blackfriday/v2"
 	"go.uber.org/zap"
@@ -27,6 +28,7 @@ func New(d *string) http.Handler {
 	dir = d
 
 	r := chi.NewRouter()
+	r.Use(otel.Middleware)
 	r.Use(middleware.RealIP)
 	r.Use(logging.Middleware(log.Desugar(), postmortems.GCPProject))
 

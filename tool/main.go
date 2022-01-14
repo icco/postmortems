@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/icco/gutil/logging"
+	"github.com/icco/gutil/otel"
 	"github.com/icco/postmortems"
 	"github.com/icco/postmortems/server"
 	"go.uber.org/zap"
@@ -72,6 +74,11 @@ serve           Serve the postmortem files in a small website.
 
 // Serve serves the content of the website.
 func Serve() error {
+	ctx := context.Background()
+	if err := otel.Init(ctx, log, postmortems.GCPProject, postmortems.Service); err != nil {
+		log.Errorw("could not init opentelemetry", zap.Error(err))
+	}
+
 	router := server.New(dir)
 
 	port := os.Getenv("PORT")
