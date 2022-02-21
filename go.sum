@@ -214,8 +214,6 @@ github.com/hinshun/vt10x v0.0.0-20180616224451-1954e6464174 h1:WlZsjVhE8Af9IcZDG
 github.com/hinshun/vt10x v0.0.0-20180616224451-1954e6464174/go.mod h1:DqJ97dSdRW1W22yXSB90986pcOyQ7r45iio1KN2ez1A=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
-github.com/icco/gutil v0.0.0-20220220010526-7c82f1ebf02d h1:0rfG17MhZkdsy5CzuOUU6NdB0CZH56Wh6axFD3K55e0=
-github.com/icco/gutil v0.0.0-20220220010526-7c82f1ebf02d/go.mod h1:Xc7MNR9CYQQS0qIRgqtTzbj81E8Sr7/46mnSO+jvoTM=
 github.com/icco/gutil v0.0.0-20220221170217-9aa326c389ec h1:RkTO2KddsDjcaJ8vGsp+L6wFsKXvlQrf7QEco45jIdE=
 github.com/icco/gutil v0.0.0-20220221170217-9aa326c389ec/go.mod h1:Xc7MNR9CYQQS0qIRgqtTzbj81E8Sr7/46mnSO+jvoTM=
 github.com/icco/zapdriver v1.4.0 h1:ACpofOtnSJT9eywNOoTuEhzo7YtFUGCc4xBXYFWYMkI=
