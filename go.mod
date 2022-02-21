@@ -9,7 +9,7 @@ require (
 	github.com/goccy/go-yaml v1.9.5
 	github.com/google/go-cmp v0.5.7
 	github.com/google/uuid v1.3.0
-	github.com/icco/gutil v0.0.0-20220220010526-7c82f1ebf02d
+	github.com/icco/gutil v0.0.0-20220221170217-9aa326c389ec
 	github.com/russross/blackfriday/v2 v2.1.0
 	go.uber.org/zap v1.21.0
 )
