@@ -202,6 +202,12 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 	pmID := chi.URLParam(r, "id")
 
+	// Validate pmID to ensure it does not contain path separators or parent directory references
+	if strings.Contains(pmID, "/") || strings.Contains(pmID, "\\") || strings.Contains(pmID, "..") {
+		http.Error(w, "Invalid postmortem ID", http.StatusBadRequest)
+		return
+	}
+
 	jsonPM := pmID + ".json"
 
 	data, err := os.ReadFile(filepath.Join("output/", jsonPM))
