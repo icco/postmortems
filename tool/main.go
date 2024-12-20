@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -135,7 +136,7 @@ func newPostmortem(dir string) error {
 	pm := postmortems.New()
 
 	err := survey.Ask(qs, pm)
-	if err == terminal.InterruptErr {
+	if errors.Is(err, terminal.InterruptErr) {
 		fmt.Println("interrupted")
 		os.Exit(0)
 	} else if err != nil {
