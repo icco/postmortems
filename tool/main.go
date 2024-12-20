@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -81,7 +82,12 @@ func Serve() error {
 
 	log.Infow("Starting up", "host", fmt.Sprintf("http://localhost:%s", port))
 
-	return http.ListenAndServe(":"+port, router)
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: router,
+	}
+
+	return srv.ListenAndServe()
 }
 
 func main() {
@@ -135,7 +141,7 @@ func newPostmortem(dir string) error {
 	pm := postmortems.New()
 
 	err := survey.Ask(qs, pm)
-	if err == terminal.InterruptErr {
+	if errors.Is(err, terminal.InterruptErr) {
 		fmt.Println("interrupted")
 		os.Exit(0)
 	} else if err != nil {
@@ -153,8 +159,7 @@ func IsURL() survey.Validator {
 			return fmt.Errorf("could not decode string")
 		}
 
-		_, err := url.Parse(str)
-		if err != nil {
+		if _, err := url.Parse(str); err != nil {
 			return fmt.Errorf("value is not a valid URL: %w", err)
 		}
 
