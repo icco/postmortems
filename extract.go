@@ -33,6 +33,7 @@ func ExtractPostmortems(loc string, dir string) error {
 
 	var data []byte
 	if isURL(loc) {
+		// #nosec
 		resp, err := http.Get(loc)
 		if err != nil {
 			return fmt.Errorf("could not get %q: %w", loc, err)

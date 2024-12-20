@@ -117,7 +117,7 @@ func GenerateJSON(d string) error {
 		return err
 	}
 
-	err = os.WriteFile(fp, j, 0644)
+	err = os.WriteFile(fp, j, 0600)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func GenerateJSON(d string) error {
 			if err != nil {
 				return err
 			}
-			err = os.WriteFile(fp, j, 0644)
+			err = os.WriteFile(fp, j, 0600)
 			if err != nil {
 				return err
 			}
@@ -188,7 +188,7 @@ func (pm *Postmortem) Save(dir string) error {
 	}
 
 	// Write postmortem data from memory to file.
-	if err := os.WriteFile(filepath.Join(dir, pm.UUID+".md"), data.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, pm.UUID+".md"), data.Bytes(), 0600); err != nil {
 		return fmt.Errorf("error writing file: %w", err)
 	}
 
