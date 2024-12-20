@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -39,12 +39,12 @@ func ExtractPostmortems(loc string, dir string) error {
 		}
 		defer resp.Body.Close()
 
-		data, err = ioutil.ReadAll(resp.Body)
+		data, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("could not read response body: %w", err)
 		}
 	} else if isFile(loc) {
-		data, err = ioutil.ReadFile(loc)
+		data, err = os.ReadFile(loc)
 		if err != nil {
 			return fmt.Errorf("error opening file %q: %w", loc, err)
 		}
