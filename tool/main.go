@@ -153,8 +153,7 @@ func IsURL() survey.Validator {
 			return fmt.Errorf("could not decode string")
 		}
 
-		_, err := url.Parse(str)
-		if err != nil {
+		if _, err := url.Parse(str); err != nil {
 			return fmt.Errorf("value is not a valid URL: %w", err)
 		}
 
