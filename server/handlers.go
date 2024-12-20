@@ -3,7 +3,6 @@ package server
 import (
 	"compress/flate"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -76,7 +75,7 @@ func LoadPostmortem(dir, filename string) (*postmortems.Postmortem, error) {
 // LoadPostmortems parses the postmortem files
 // and returns a slice with their content.
 func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("error opening data folder: %w", err)
 	}
@@ -205,7 +204,7 @@ func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	jsonPM := pmID + ".json"
 
-	data, err := ioutil.ReadFile(filepath.Join("output/", jsonPM))
+	data, err := os.ReadFile(filepath.Join("output/", jsonPM))
 	if err != nil {
 		log.Errorw("load postmortem json", "pmid", pmID, zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
