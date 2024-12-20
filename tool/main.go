@@ -127,7 +127,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Println(usageText)
+	fmt.Print(usageText)
 	os.Exit(0)
 }
 
