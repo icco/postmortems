@@ -82,7 +82,12 @@ func Serve() error {
 
 	log.Infow("Starting up", "host", fmt.Sprintf("http://localhost:%s", port))
 
-	return http.ListenAndServe(":"+port, router)
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: router,
+	}
+
+	return srv.ListenAndServe()
 }
 
 func main() {
