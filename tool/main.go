@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -83,8 +84,10 @@ func Serve() error {
 	log.Infow("Starting up", "host", fmt.Sprintf("http://localhost:%s", port))
 
 	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: router,
+		Addr:         ":" + port,
+		Handler:      router,
+		ReadTimeout:  1 * time.Second,
+		WriteTimeout: 1 * time.Second,
 	}
 
 	return srv.ListenAndServe()
