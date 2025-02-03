@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/gernest/front v0.0.0-20210301115436-8a0b0a782d0a
 	github.com/go-chi/chi/v5 v5.2.0
-	github.com/goccy/go-yaml v1.15.15
+	github.com/goccy/go-yaml v1.15.17
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/icco/gutil v0.0.0-20241216022053-944972fc0ecf
