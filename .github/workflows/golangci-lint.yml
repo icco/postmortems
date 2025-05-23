@@ -11,10 +11,13 @@ jobs:
   golangci:
     name: lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
-          args: -E bodyclose,misspell,gosec,goconst,gci,errorlint
+          args: -E bodyclose,misspell,gosec,goconst,errorlint
