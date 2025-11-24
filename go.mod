@@ -13,7 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/icco/gutil v0.0.0-20250215014032-7b1b73930901
 	github.com/russross/blackfriday/v2 v2.1.0
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 )
 
 require (
