@@ -7,7 +7,7 @@ toolchain go1.24.3
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/gernest/front v0.0.0-20210301115436-8a0b0a782d0a
-	github.com/go-chi/chi/v5 v5.2.1
+	github.com/go-chi/chi/v5 v5.2.3
 	github.com/goccy/go-yaml v1.19.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
