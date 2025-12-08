@@ -105,7 +105,7 @@ func Parse(f io.Reader) (*Postmortem, error) {
 func GenerateJSON(d string) error {
 	baseDir := "./output"
 
-	err := os.MkdirAll(baseDir, os.ModePerm)
+	err := os.MkdirAll(baseDir, 0750)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func GenerateJSON(d string) error {
 		}
 
 		if !info.IsDir() {
-			f, err := os.Open(path)
+			f, err := os.Open(path) // #nosec G304
 			if err != nil {
 				return err
 			}

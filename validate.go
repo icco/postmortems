@@ -36,7 +36,7 @@ func ValidateDir(d string) ([]*Postmortem, error) {
 
 // ValidateFile takes a file path and validates just that file.
 func ValidateFile(filename string) (*Postmortem, error) {
-	f, err := os.Open(filename)
+	f, err := os.Open(filename) // #nosec G304
 	if err != nil {
 		return nil, err
 	}

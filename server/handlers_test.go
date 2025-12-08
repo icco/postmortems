@@ -40,7 +40,9 @@ func TestHealthzCheckHandler(t *testing.T) {
 				t.Errorf("Unexpected status code %d", resp.StatusCode)
 				return
 			}
-			defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 
 			// Check the response body is what we expect.
 			if diff := cmp.Diff(w.Body.Bytes(), tc.want); diff != "" {

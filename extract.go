@@ -33,19 +33,21 @@ func ExtractPostmortems(loc string, dir string) error {
 
 	var data []byte
 	if isURL(loc) {
-		// #nosec
+		// #nosec G107
 		resp, err := http.Get(loc)
 		if err != nil {
 			return fmt.Errorf("could not get %q: %w", loc, err)
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		data, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("could not read response body: %w", err)
 		}
 	} else if isFile(loc) {
-		data, err = os.ReadFile(loc)
+		data, err = os.ReadFile(loc) // #nosec G304
 		if err != nil {
 			return fmt.Errorf("error opening file %q: %w", loc, err)
 		}
