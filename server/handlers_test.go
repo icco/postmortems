@@ -41,7 +41,9 @@ func TestHealthzCheckHandler(t *testing.T) {
 				return
 			}
 			defer func() {
-				_ = resp.Body.Close()
+				if err := resp.Body.Close(); err != nil {
+					t.Errorf("failed to close response body: %v", err)
+				}
 			}()
 
 			// Check the response body is what we expect.

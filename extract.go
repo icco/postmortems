@@ -39,7 +39,9 @@ func ExtractPostmortems(loc string, dir string) error {
 			return fmt.Errorf("could not get %q: %w", loc, err)
 		}
 		defer func() {
-			_ = resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				log.Warnw("failed to close response body", "error", err)
+			}
 		}()
 
 		data, err = io.ReadAll(resp.Body)
