@@ -129,7 +129,7 @@ func GenerateJSON(d string) error {
 		}
 
 		if !info.IsDir() {
-			f, err := os.Open(path) // #nosec G304
+			f, err := os.Open(path) // #nosec G304,G122
 			if err != nil {
 				return err
 			}

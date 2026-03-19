@@ -60,7 +60,8 @@ func healthzHandler(w http.ResponseWriter, r *http.Request) {
 
 // LoadPostmortem loads the postmortem data in memory.
 func LoadPostmortem(dir, filename string) (*postmortems.Postmortem, error) {
-	f, err := os.Open(filepath.Join(dir, filename))
+	filename = filepath.Base(filename)
+	f, err := os.Open(filepath.Join(dir, filename)) // #nosec G304 -- filename is sanitized via filepath.Base
 	if err != nil {
 		return nil, fmt.Errorf("error opening postmortem: %w", err)
 	}
@@ -209,18 +210,20 @@ func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonPM := pmID + ".json"
+	jsonPM := filepath.Base(pmID + ".json")
 
-	data, err := os.ReadFile(filepath.Join("output/", jsonPM))
+	data, err := os.ReadFile(filepath.Join("output", jsonPM)) // #nosec G304 -- jsonPM is sanitized via filepath.Base
 	if err != nil {
 		log.Errorw("load postmortem json", "pmid", pmID, zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+
+		return
 	}
 
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 
-	if _, err := w.Write(data); err != nil {
+	if _, err := w.Write(data); err != nil { // #nosec G705 -- Content-Type is set to application/json, not text/html
 		log.Errorw("error writing response to postmortem JSON request", zap.Error(err))
 	}
 }
