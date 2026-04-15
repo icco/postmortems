@@ -105,7 +105,7 @@ func Parse(f io.Reader) (*Postmortem, error) {
 func GenerateJSON(d string) error {
 	baseDir := "./output"
 
-	err := os.MkdirAll(baseDir, 0750)
+	err := os.MkdirAll(baseDir, 0755)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func GenerateJSON(d string) error {
 		return err
 	}
 
-	err = os.WriteFile(fp, j, 0600)
+	err = os.WriteFile(fp, j, 0644)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func GenerateJSON(d string) error {
 			if err != nil {
 				return err
 			}
-			err = os.WriteFile(fp, j, 0600)
+			err = os.WriteFile(fp, j, 0644)
 			if err != nil {
 				return err
 			}
