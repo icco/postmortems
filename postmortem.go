@@ -105,7 +105,7 @@ func Parse(f io.Reader) (*Postmortem, error) {
 func GenerateJSON(d string) error {
 	baseDir := "./output"
 
-	err := os.MkdirAll(baseDir, 0755)
+	err := os.MkdirAll(baseDir, 0755) // #nosec G301 -- world-readable so non-root serve process can traverse
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func GenerateJSON(d string) error {
 		return err
 	}
 
-	err = os.WriteFile(fp, j, 0644)
+	err = os.WriteFile(fp, j, 0644) // #nosec G306 -- world-readable so non-root serve process can read
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func GenerateJSON(d string) error {
 			if err != nil {
 				return err
 			}
-			err = os.WriteFile(fp, j, 0644)
+			err = os.WriteFile(fp, j, 0644) // #nosec G306 -- world-readable so non-root serve process can read
 			if err != nil {
 				return err
 			}
