@@ -3,11 +3,11 @@ package server
 import (
 	"compress/flate"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"text/template"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -21,6 +21,32 @@ var (
 	dir *string
 	log = logging.Must(logging.NewLogger(postmortems.Service))
 )
+
+// postmortemView is a rendering-layer copy of Postmortem that stores the
+// Description as template.HTML so that html/template outputs the pre-rendered
+// Markdown HTML verbatim rather than double-escaping it.
+type postmortemView struct {
+	UUID        string
+	URL         string
+	Company     string
+	Product     string
+	Categories  []string
+	Description template.HTML // rendered Markdown; already sanitised by blackfriday
+}
+
+// toView converts a Postmortem whose Description field has already been
+// processed through blackfriday into a postmortemView suitable for
+// html/template rendering.
+func toView(pm *postmortems.Postmortem) postmortemView {
+	return postmortemView{
+		UUID:        pm.UUID,
+		URL:         pm.URL,
+		Company:     pm.Company,
+		Product:     pm.Product,
+		Categories:  pm.Categories,
+		Description: template.HTML(pm.Description), // #nosec G203 -- blackfriday output
+	}
+}
 
 // New creates a new HTTP routing handler.
 func New(d *string) http.Handler {
@@ -97,6 +123,8 @@ func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
 }
 
 // renderTemplate renders the template and its respective data.
+// It uses html/template (not text/template) so all data values interpolated
+// with {{ .Field }} are HTML-escaped automatically, preventing XSS.
 func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data interface{}) {
 	lp := filepath.Join("templates", "layout.html")
 	fp := filepath.Join("templates", view)
@@ -186,16 +214,17 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert Markdown formatting of descriptions to HTML.
-	htmlDesc := blackfriday.Run([]byte(pm.Description))
-	pm.Description = string(htmlDesc)
+	// Convert Markdown to HTML, then wrap in template.HTML so html/template
+	// does not double-escape the rendered markup.
+	pm.Description = string(blackfriday.Run([]byte(pm.Description)))
+	view := toView(pm)
 
 	page := struct {
 		Categories  []string
-		Postmortems []*postmortems.Postmortem
+		Postmortems []postmortemView
 	}{
 		Categories:  postmortems.Categories,
-		Postmortems: []*postmortems.Postmortem{pm},
+		Postmortems: []postmortemView{view},
 	}
 
 	renderTemplate(w, r, "postmortem.html", page)
