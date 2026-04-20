@@ -228,7 +228,7 @@ func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if _, err := w.Write(data); err { // #nosec G705 -- Content-Type is set to application/json, not text/html
+	if _, err := w.Write(data); err != nil { // #nosec G705 -- Content-Type is set to application/json, not text/html
 		log.Errorw("error writing response to postmortem JSON request", zap.Error(err))
 	}
 }
