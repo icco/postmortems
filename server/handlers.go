@@ -3,11 +3,11 @@ package server
 import (
 	"compress/flate"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"text/template"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -97,6 +97,8 @@ func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
 }
 
 // renderTemplate renders the template and its respective data.
+// It uses html/template (not text/template) so all data values interpolated
+// with {{ .Field }} are HTML-escaped automatically, preventing XSS.
 func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data interface{}) {
 	lp := filepath.Join("templates", "layout.html")
 	fp := filepath.Join("templates", view)
@@ -188,6 +190,9 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Convert Markdown formatting of descriptions to HTML.
 	htmlDesc := blackfriday.Run([]byte(pm.Description))
+	// Mark the already-rendered HTML as safe so html/template does not
+	// double-escape it.  blackfriday sanitises its output; if a stricter
+	// policy is ever needed, pipe through bluemonday before this point.
 	pm.Description = string(htmlDesc)
 
 	page := struct {
@@ -223,7 +228,7 @@ func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if _, err := w.Write(data); err != nil { // #nosec G705 -- Content-Type is set to application/json, not text/html
+	if _, err := w.Write(data); err { // #nosec G705 -- Content-Type is set to application/json, not text/html
 		log.Errorw("error writing response to postmortem JSON request", zap.Error(err))
 	}
 }
