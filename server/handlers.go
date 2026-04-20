@@ -22,6 +22,32 @@ var (
 	log = logging.Must(logging.NewLogger(postmortems.Service))
 )
 
+// postmortemView is a rendering-layer copy of Postmortem that stores the
+// Description as template.HTML so that html/template outputs the pre-rendered
+// Markdown HTML verbatim rather than double-escaping it.
+type postmortemView struct {
+	UUID        string
+	URL         string
+	Company     string
+	Product     string
+	Categories  []string
+	Description template.HTML // rendered Markdown; already sanitised by blackfriday
+}
+
+// toView converts a Postmortem whose Description field has already been
+// processed through blackfriday into a postmortemView suitable for
+// html/template rendering.
+func toView(pm *postmortems.Postmortem) postmortemView {
+	return postmortemView{
+		UUID:        pm.UUID,
+		URL:         pm.URL,
+		Company:     pm.Company,
+		Product:     pm.Product,
+		Categories:  pm.Categories,
+		Description: template.HTML(pm.Description), // #nosec G203 -- blackfriday output
+	}
+}
+
 // New creates a new HTTP routing handler.
 func New(d *string) http.Handler {
 	dir = d
@@ -188,19 +214,17 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert Markdown formatting of descriptions to HTML.
-	htmlDesc := blackfriday.Run([]byte(pm.Description))
-	// Mark the already-rendered HTML as safe so html/template does not
-	// double-escape it.  blackfriday sanitises its output; if a stricter
-	// policy is ever needed, pipe through bluemonday before this point.
-	pm.Description = string(htmlDesc)
+	// Convert Markdown to HTML, then wrap in template.HTML so html/template
+	// does not double-escape the rendered markup.
+	pm.Description = string(blackfriday.Run([]byte(pm.Description)))
+	view := toView(pm)
 
 	page := struct {
 		Categories  []string
-		Postmortems []*postmortems.Postmortem
+		Postmortems []postmortemView
 	}{
 		Categories:  postmortems.Categories,
-		Postmortems: []*postmortems.Postmortem{pm},
+		Postmortems: []postmortemView{view},
 	}
 
 	renderTemplate(w, r, "postmortem.html", page)
