@@ -18,6 +18,10 @@ RUN /pm -action=validate && /pm -action=generate
 # Final stage
 FROM alpine:3.23
 
+LABEL org.opencontainers.image.source=https://github.com/icco/postmortems
+LABEL org.opencontainers.image.description="Postmortem metadata from danluu/post-mortems."
+LABEL org.opencontainers.image.licenses=GPL-3.0
+
 RUN apk add --no-cache ca-certificates tzdata
 RUN adduser -S -u 1001 app
 
