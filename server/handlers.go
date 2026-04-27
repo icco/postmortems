@@ -53,8 +53,7 @@ func New(d *string) http.Handler {
 	dir = d
 
 	r := chi.NewRouter()
-	r.Use(middleware.RealIP)
-	r.Use(logging.Middleware(log.Desugar(), postmortems.GCPProject))
+	r.Use(logging.Middleware(log.Desugar()))
 
 	compressor := middleware.NewCompressor(flate.DefaultCompression)
 	r.Use(compressor.Handler)
@@ -80,7 +79,7 @@ func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 
 	if _, err := w.Write([]byte("ok.")); err != nil {
-		log.Errorw("error writing response to healthz request", zap.Error(err))
+		logging.FromContext(r.Context()).Errorw("error writing response to healthz request", zap.Error(err))
 	}
 }
 
@@ -126,6 +125,7 @@ func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
 // It uses html/template (not text/template) so all data values interpolated
 // with {{ .Field }} are HTML-escaped automatically, preventing XSS.
 func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data interface{}) {
+	l := logging.FromContext(r.Context())
 	lp := filepath.Join("templates", "layout.html")
 	fp := filepath.Join("templates", view)
 
@@ -140,14 +140,14 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data in
 
 	tmpl, err := template.ParseFiles(lp, fp)
 	if err != nil {
-		log.Errorw("template parse error", zap.Error(err))
+		l.Errorw("template parse error", "view", view, zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 
 		return
 	}
 
 	if err := tmpl.ExecuteTemplate(w, "layout", data); err != nil {
-		log.Errorw("template execute error", zap.Error(err))
+		l.Errorw("template execute error", "view", view, zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
@@ -168,11 +168,12 @@ func getPosmortemByCategory(pms []*postmortems.Postmortem, category string) []po
 }
 
 func categoryPageHandler(w http.ResponseWriter, r *http.Request) {
+	l := logging.FromContext(r.Context())
 	ct := chi.URLParam(r, "category")
 
 	pms, err := LoadPostmortems(*dir)
 	if err != nil {
-		log.Errorw("load postmortems", zap.Error(err))
+		l.Errorw("load postmortems", "category", ct, zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 
 		return
@@ -204,11 +205,12 @@ func aboutPageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
+	l := logging.FromContext(r.Context())
 	pmID := chi.URLParam(r, "id")
 
 	pm, err := LoadPostmortem(*dir, pmID+".md")
 	if err != nil {
-		log.Warnw("load postmortem", "pmid", pmID, zap.Error(err))
+		l.Warnw("load postmortem", "pmid", pmID, zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 
 		return
@@ -231,6 +233,7 @@ func postmortemPageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
+	l := logging.FromContext(r.Context())
 	pmID := chi.URLParam(r, "id")
 
 	// Validate pmID to ensure it does not contain path separators or parent directory references
@@ -243,7 +246,7 @@ func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	data, err := os.ReadFile(filepath.Join("output", jsonPM)) // #nosec G304 -- jsonPM is sanitized via filepath.Base
 	if err != nil {
-		log.Errorw("load postmortem json", "pmid", pmID, zap.Error(err))
+		l.Errorw("load postmortem json", "pmid", pmID, zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 
 		return
@@ -253,14 +256,15 @@ func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if _, err := w.Write(data); err != nil { // #nosec G705 -- Content-Type is set to application/json, not text/html
-		log.Errorw("error writing response to postmortem JSON request", zap.Error(err))
+		l.Errorw("error writing response to postmortem JSON request", "pmid", pmID, zap.Error(err))
 	}
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
+	l := logging.FromContext(r.Context())
 	pms, err := LoadPostmortems(*dir)
 	if err != nil {
-		log.Errorw("load postmortems", zap.Error(err))
+		l.Errorw("load postmortems", zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 
 		return

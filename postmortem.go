@@ -46,9 +46,6 @@ var (
 	// Service defines the service this runs in on GCP.
 	Service = "postmortems"
 
-	// GCPProject defines the project this code runs in and should log to.
-	GCPProject = "icco-cloud"
-
 	log = logging.Must(logging.NewLogger(Service))
 )
 
