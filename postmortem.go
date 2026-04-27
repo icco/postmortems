@@ -16,8 +16,7 @@ import (
 	"github.com/icco/gutil/logging"
 )
 
-// Postmortem is a structural representation of a postmortem summary and its
-// metadata.
+// Postmortem is a postmortem summary plus its metadata.
 type Postmortem struct {
 	UUID        string    `yaml:"uuid"`
 	URL         string    `yaml:"url"`
@@ -120,7 +119,6 @@ func GenerateJSON(d string) error {
 	}
 
 	return filepath.Walk(d, func(path string, info os.FileInfo, err error) error {
-		// Failed to open path
 		if err != nil {
 			return err
 		}
@@ -167,8 +165,7 @@ func New() *Postmortem {
 	return &Postmortem{UUID: id.String()}
 }
 
-// Save takes the in-memory representation of the postmortem file and stores it
-// in a file.
+// Save writes pm to dir as <UUID>.md.
 func (pm *Postmortem) Save(dir string) error {
 	var data bytes.Buffer
 
@@ -184,7 +181,6 @@ func (pm *Postmortem) Save(dir string) error {
 		return fmt.Errorf("error executing template: %w", err)
 	}
 
-	// Write postmortem data from memory to file.
 	if err := os.WriteFile(filepath.Join(dir, pm.UUID+".md"), data.Bytes(), 0600); err != nil {
 		return fmt.Errorf("error writing file: %w", err)
 	}
