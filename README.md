@@ -2,13 +2,11 @@
 
 [![GoDoc](https://godoc.org/github.com/icco/postmortems?status.svg)](https://godoc.org/github.com/icco/postmortems) [![Go Report Card](https://goreportcard.com/badge/github.com/icco/postmortems)](https://goreportcard.com/report/github.com/icco/postmortems)
 
-Available at https://postmortems.app
+Public corpus of annotated postmortems, hosted at <https://postmortems.app>. Builds on
+[danluu/post-mortems](https://github.com/danluu/post-mortems) by adding categories, time
+data, and room for in-depth analysis.
 
-This repo means to create a public repository of postmortems with annotated metadata and summaries of public postmortem documents. This repo takes the work in https://github.com/danluu/post-mortems and expands on it, trying to add categories, time data, and room for more in-depth analysis.
-
-If you'd like to contribute, either edit a postmortem file in the data folder, or try to fix an issue.
-
-If you want further process the postmortem metadata files locally, we have a [folder](https://postmortems.app/output/) with all the metadata in JSON format. Please let us know your findings.
+JSON metadata for every entry is published at <https://postmortems.app/output/>.
 
 ## Tool
 
@@ -27,8 +25,11 @@ validate    Validate the postmortem files in the directory.
 serve       Serve the postmortem files in a small website.
 ```
 
+## Contributing
+
+Edit a file under `data/` or open an issue.
+
 ## Shoutouts
 
- - @dastergon for fixing a bunch of bugs, porting hacky Ruby code to Go, and implementing webserver!
-
-If you would like to find postmortem templates from various companies, you can check at the [postmortem-templates](https://github.com/dastergon/postmortem-templates) repository on Github.
+- @dastergon for fixing bugs, porting hacky Ruby to Go, and implementing the webserver.
+  See also [postmortem-templates](https://github.com/dastergon/postmortem-templates).

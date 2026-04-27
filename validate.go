@@ -7,11 +7,10 @@ import (
 	"path/filepath"
 )
 
-// ValidateDir takes a directory path and validates every file in there.
+// ValidateDir validates every file under d.
 func ValidateDir(d string) ([]*Postmortem, error) {
 	var ret []*Postmortem
 	err := filepath.Walk(d, func(path string, info os.FileInfo, err error) error {
-		// Failed to open path
 		if err != nil {
 			return err
 		}
@@ -34,7 +33,7 @@ func ValidateDir(d string) ([]*Postmortem, error) {
 	return ret, err
 }
 
-// ValidateFile takes a file path and validates just that file.
+// ValidateFile validates a single postmortem file.
 func ValidateFile(filename string) (*Postmortem, error) {
 	f, err := os.Open(filename) // #nosec G304
 	if err != nil {
@@ -68,8 +67,7 @@ func ValidateFile(filename string) (*Postmortem, error) {
 	return p, nil
 }
 
-// CategoriesContain takes a string and decides
-// if it is in the category whitelist.
+// CategoriesContain reports whether e is in the category whitelist.
 func CategoriesContain(e string) bool {
 	for _, a := range Categories {
 		if a == e {

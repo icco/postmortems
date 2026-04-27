@@ -23,8 +23,7 @@ var (
 `
 )
 
-// ExtractPostmortems reads the collection of postmortems
-// and extracts each postmortem to a separate file.
+// ExtractPostmortems extracts each postmortem entry from loc into its own file under dir.
 func ExtractPostmortems(loc string, dir string) error {
 	posts, err := ValidateDir(dir)
 	if err != nil {

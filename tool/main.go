@@ -1,6 +1,8 @@
+// Command pm operates on the postmortem corpus and serves the website.
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -14,6 +16,11 @@ import (
 	"github.com/icco/gutil/logging"
 	"github.com/icco/postmortems"
 	"github.com/icco/postmortems/server"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel"
+	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.uber.org/zap"
 )
 
@@ -72,9 +79,28 @@ serve           Serve the postmortem files in a small website.
 	extractFile  = "./tmp/posts.md"
 )
 
-// Serve serves the content of the website.
+// Serve runs the HTTP server with otelhttp metrics exposed on /metrics.
 func Serve() error {
-	router := server.New(dir)
+	registry := prometheus.NewRegistry()
+	exporter, err := otelprom.New(otelprom.WithRegisterer(registry))
+	if err != nil {
+		return fmt.Errorf("otel prometheus exporter: %w", err)
+	}
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(exporter))
+	otel.SetMeterProvider(mp)
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := mp.Shutdown(ctx); err != nil {
+			log.Warnw("meter provider shutdown", zap.Error(err))
+		}
+	}()
+
+	router := server.New(server.Options{
+		Logger:         log,
+		MetricsHandler: promhttp.HandlerFor(registry, promhttp.HandlerOpts{}),
+		Dir:            *dir,
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -92,7 +118,10 @@ func Serve() error {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	return srv.ListenAndServe()
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return fmt.Errorf("http server: %w", err)
+	}
+	return nil
 }
 
 func main() {
@@ -102,19 +131,16 @@ func main() {
 	if action == nil || *action == "" {
 		log.Warnw("no action specified")
 		usage()
-
 		return
 	}
 
 	if dir == nil || *dir == "" {
 		log.Warnw("no directory specified")
 		usage()
-
 		return
 	}
 
 	var err error
-
 	switch *action {
 	case "extract":
 		err = postmortems.ExtractPostmortems(extractFile, *dir)
@@ -156,18 +182,16 @@ func newPostmortem(dir string) error {
 	return pm.Save(dir)
 }
 
-// IsURL creates a validator that makes sure it's a parsable URL.
+// IsURL validates that a value parses as an absolute URL.
 func IsURL() survey.Validator {
 	return func(val interface{}) error {
 		str, ok := val.(string)
 		if !ok {
 			return fmt.Errorf("could not decode string")
 		}
-
 		if _, err := url.Parse(str); err != nil {
 			return fmt.Errorf("value is not a valid URL: %w", err)
 		}
-
 		return nil
 	}
 }
