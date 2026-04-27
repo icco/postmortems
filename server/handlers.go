@@ -108,8 +108,11 @@ func healthzHandler(w http.ResponseWriter, r *http.Request) {
 
 // LoadPostmortem reads a single postmortem from dir.
 func LoadPostmortem(dir, filename string) (*postmortems.Postmortem, error) {
+	if strings.Contains(filename, "/") || strings.Contains(filename, "\\") || strings.Contains(filename, "..") {
+		return nil, fmt.Errorf("invalid postmortem filename: %q", filename)
+	}
 	filename = filepath.Base(filename)
-	f, err := os.Open(filepath.Join(dir, filename)) // #nosec G304 -- filename sanitized via filepath.Base
+	f, err := os.Open(filepath.Join(dir, filename)) // #nosec G304 -- filename validated above
 	if err != nil {
 		return nil, fmt.Errorf("error opening postmortem: %w", err)
 	}
@@ -219,6 +222,11 @@ func postmortemPageHandler(dir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		l := logging.FromContext(r.Context())
 		pmID := chi.URLParam(r, "id")
+
+		if strings.Contains(pmID, "/") || strings.Contains(pmID, "\\") || strings.Contains(pmID, "..") {
+			http.Error(w, "Invalid postmortem ID", http.StatusBadRequest)
+			return
+		}
 
 		pm, err := LoadPostmortem(dir, pmID+".md")
 		if err != nil {
