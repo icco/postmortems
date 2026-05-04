@@ -1,9 +1,4 @@
-/* Custom additions on top of Tailwind 4 + daisyUI 5.
- *
- * Both frameworks are loaded from CDN in templates/layout.html (see
- * https://github.com/icco/postmortems/issues/107). Add only what
- * Tailwind/daisyUI doesn't already provide here.
- */
+/* Gap-fillers on top of the Tailwind/daisyUI CDN bundles. */
 
 html,
 body {
@@ -11,9 +6,7 @@ body {
   padding: 0;
 }
 
-/* Restore prose-style spacing for blackfriday-rendered descriptions on
- * the postmortem page; daisyUI deliberately leaves bare typography to
- * Tailwind's `prose` plugin which we are not loading via CDN. */
+/* Prose styling for blackfriday-rendered Markdown (no Tailwind prose plugin via CDN). */
 .prose p {
   margin: 0 0 1em;
   line-height: 1.6;
@@ -62,8 +55,7 @@ body {
   font-style: italic;
 }
 
-/* Sortable table affordance: subtle hover and arrow styling for the
- * sort-table.js arrows. Keeps focus visible for keyboard sort. */
+/* Sortable-table affordances for sort-table.js. */
 .sortable-th {
   user-select: none;
 }
