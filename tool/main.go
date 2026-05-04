@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -26,13 +27,20 @@ import (
 )
 
 var (
-	log              = logging.Must(logging.NewLogger(postmortems.Service))
-	action           = flag.String("action", "", "")
-	dir              = flag.String("dir", "./data/", "")
-	categorizeApply  = flag.Bool("apply", false, "categorize: write suggested categories back into the markdown files (default: dry run)")
-	categorizeWorker = flag.Int("workers", 8, "categorize: number of concurrent HTTP fetchers")
-	categorizeTime   = flag.Duration("http-timeout", 15*time.Second, "categorize: per-URL fetch timeout")
-	qs     = []*survey.Question{
+	log            = logging.Must(logging.NewLogger(postmortems.Service))
+	action         = flag.String("action", "", "")
+	dir            = flag.String("dir", "./data/", "")
+	enrichApply    = flag.Bool("apply", false, "enrich: write changes back into the markdown files (default: dry run)")
+	enrichTimeout  = flag.Duration("http-timeout", 15*time.Second, "enrich: per-URL fetch timeout")
+	enrichOnly     = flag.String("only", "", "enrich: only process files whose name starts with this UUID prefix")
+	enrichForce    = flag.Bool("force", false, "enrich: overwrite non-empty fields (default: only fill blanks)")
+	enrichKeepDesc = flag.Bool("keep-description", false, "enrich: preserve existing markdown body, only refresh metadata")
+	enrichMaxAge   = flag.Duration("max-age", 720*time.Hour, "enrich: skip files whose source_fetched_at is newer than this")
+	enrichWorkers  = flag.Int("enrich-workers", 4, "enrich: number of concurrent fetch+LLM workers")
+	gcpProject     = flag.String("gcp-project", os.Getenv("GOOGLE_CLOUD_PROJECT"), "enrich: GCP project for Vertex AI (defaults to GOOGLE_CLOUD_PROJECT)")
+	gcpLocation    = flag.String("gcp-location", "us-central1", "enrich: Vertex AI location/region")
+	geminiModel    = flag.String("gemini-model", "gemini-2.5-flash", "enrich: Gemini model name")
+	qs               = []*survey.Question{
 		{
 			Name:     "url",
 			Prompt:   &survey.Input{Message: "URL of Postmortem?"},
@@ -90,8 +98,11 @@ generate        Generate JSON files from the postmortem Markdown files.
 new             Create a new postmortem file.
 validate        Validate the postmortem files in the directory.
 serve           Serve the postmortem files in a small website.
-categorize      Scrape each postmortem URL and suggest additional categories.
-                Pass -apply to write suggestions back to the markdown files.
+enrich          Fetch each postmortem source URL (with Wayback fallback), extract metadata,
+                run regex-based category suggestions, ask Gemini for incident
+                times/product/expanded description, and write the merged result back.
+                Requires GOOGLE_APPLICATION_CREDENTIALS and a GCP project. Pass -apply to
+                write changes; -force to overwrite non-empty fields.
 `
 	danluuReadme = "https://raw.githubusercontent.com/danluu/post-mortems/master/README.md"
 	extractFile  = "./tmp/posts.md"
@@ -170,17 +181,8 @@ func main() {
 		err = newPostmortem(*dir)
 	case "validate":
 		_, err = postmortems.ValidateDir(*dir)
-	case "categorize":
-		var res []categorizeResult
-		res, err = CategorizePostmortems(categorizeOptions{
-			Dir:         *dir,
-			Apply:       *categorizeApply,
-			HTTPTimeout: *categorizeTime,
-			Concurrency: *categorizeWorker,
-		})
-		if err == nil {
-			printCategorizeReport(os.Stdout, res, *categorizeApply)
-		}
+	case "enrich":
+		err = runEnrich()
 	case "serve":
 		err = Serve()
 	default:
@@ -190,6 +192,38 @@ func main() {
 	if err != nil {
 		log.Fatalw("running action failed", zap.Error(err))
 	}
+}
+
+// runEnrich wires the CLI flags into the enrich pipeline. Kept out of
+// main() so the action's dependencies (Vertex AI client) aren't
+// constructed for unrelated actions.
+func runEnrich() error {
+	ctx := context.Background()
+	llm, err := NewGeminiClient(ctx, *gcpProject, *gcpLocation, *geminiModel)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = llm.Close() }()
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	res, err := EnrichPostmortems(ctx, enrichOptions{
+		Dir:             *dir,
+		Only:            *enrichOnly,
+		Apply:           *enrichApply,
+		Force:           *enrichForce,
+		KeepDescription: *enrichKeepDesc,
+		MaxAge:          *enrichMaxAge,
+		HTTPTimeout:     *enrichTimeout,
+		Concurrency:     *enrichWorkers,
+		LLM:             llm,
+		Logger:          logger,
+	})
+	if err != nil {
+		return err
+	}
+	LogEnrichReport(logger, res, *enrichApply)
+	return nil
 }
 
 func usage() {

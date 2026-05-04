@@ -5,7 +5,10 @@ categories:
 - postmortem
 company: VZaar
 product: ""
+source_published_at: 2025-10-09T08:08:30Z
+source_fetched_at: 2026-05-04T19:04:32.218226Z
 
 ---
 
 A release was made from the wrong VCS branch. This lead to database changes being applied which broke production.
+

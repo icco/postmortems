@@ -18,32 +18,94 @@ Options:
 -dir        The directory with Markdown files for to extract or parse. Defaults to ./data
 
 Actions:
-extract     Extract postmortems from the collection and create separate files.
-generate    Generate JSON files from the postmortem Markdown files.
-new         Create a new postmortem file.
-validate    Validate the postmortem files in the directory.
-serve       Serve the postmortem files in a small website.
-categorize  Scrape each postmortem's source URL and suggest categories.
+extract         Extract postmortems from the collection and create separate files.
+upstream-fetch  Download and extract postmortems from danluu/post-mortems.
+generate        Generate JSON files from the postmortem Markdown files.
+new             Create a new postmortem file.
+validate        Validate the postmortem files in the directory.
+serve           Serve the postmortem files in a small website.
+enrich          Fetch each source URL (with Wayback fallback), extract metadata,
+                run regex-based category suggestions, and ask Gemini for
+                incident times/product/expanded description.
 ```
 
-### `categorize`
+### `enrich`
 
-The `categorize` action fetches each postmortem's source URL and greps
-the response body against a set of regular expressions per category
-(see `tool/categorize.go`). Without `-apply` it runs as a dry-run that
-prints suggestions to stdout. With `-apply` it merges the suggested
-categories back into each Markdown file.
+For every `data/*.md`, `enrich` fetches the source URL (with Wayback
+fallback), extracts page metadata, applies regex-based category
+suggestions, and asks Vertex Gemini for incident times, product,
+keywords and an expanded description. The original one-liner is
+preserved in `summary:` so the long-form `description:` body can be
+rewritten without losing the editorial blurb.
+
+Needs `GOOGLE_APPLICATION_CREDENTIALS` and `GOOGLE_CLOUD_PROJECT` (or
+`-gcp-project`). Default model `gemini-2.5-flash` (~$0.10–$1 for the
+full corpus).
 
 ```sh
-# dry run
-go run ./tool -action=categorize
-
-# write suggestions back into ./data/*.md
-go run ./tool -action=categorize -apply
+go run ./tool -action=enrich                    # dry run
+go run ./tool -action=enrich -apply             # write changes
+go run ./tool -action=enrich -apply -force      # overwrite non-empty fields
+go run ./tool -action=enrich -apply -only=01494547
 ```
 
-The tool is intentionally a one-shot helper: review the diff before
-committing. There is no automated PR-filing bot.
+Other flags: `-keep-description`, `-max-age=720h`, `-gcp-location`,
+`-gemini-model`, `-enrich-workers`. After enriching, run
+`go run ./tool -action=generate` to refresh `output/*.json`.
+
+#### YAML schema
+
+| Field | Source | Notes |
+| --- | --- | --- |
+| `url` | hand-curated | Wayback URLs auto-unwrapped to the origin. |
+| `archive_url` | Wayback availability API | Recorded for every entry when a snapshot exists. |
+| `title` | LLM > page `<title>` | Bad-title patterns (status page, captcha, blog index, bare domain) are treated as empty. |
+| `start_time`, `end_time` | LLM | RFC3339; left unset on low confidence. |
+| `categories` | hand-curated + regex | Suggestions are unioned with existing values. |
+| `keywords` | LLM | Case-insensitive union with existing values. |
+| `company`, `product` | hand-curated; LLM fills blanks | `-force` lets the LLM overwrite. |
+| `summary` | original blurb | Auto-populated when `description` is rewritten. |
+| `source_published_at` | page metadata (OpenGraph/JSON-LD) | |
+| `source_fetched_at` | enrich run | Used for `-max-age` freshness skipping. |
+| `description` (body) | LLM expansion | Falls back to `summary` if the LLM has nothing. |
+
+#### How enrich handles junk pages
+
+A lot of the original sources are dead, paywalled, captcha-walled,
+status-page chrome, or rebrand-redirected to marketing pages. Several
+heuristics keep these from polluting the corpus:
+
+1. **Wayback unwrap.** A `url:` that's already a Wayback snapshot is
+   rewritten to the origin URL with the snapshot moved to `archive_url:`.
+2. **Wayback retry.** When the live origin returns 200 but Gemini
+   reports the page is useless, `enrich` re-fetches the Wayback snapshot
+   and re-runs the LLM. The second result is only adopted when it
+   passes the junk check.
+3. **Junk-description detection.** Gemini emits stock disclaimers
+   ("the provided article text…", "is a marketing page", "in raw PDF
+   format", "domain is for sale", "captcha", etc.) when it has nothing
+   to work with. `looksLikeJunkDescription` matches these and we
+   discard the entire LLM result instead of writing it.
+4. **Bad-title detection.** `isBadTitle` rejects scraped titles like
+   `Heroku Status`, `PagerDuty Status Page`, `Wayback Machine`,
+   `Redirecting…`, `Help Center Closed`, `Loading`, `Please wait …
+   verification`, `Acme Tech Blog`, `Acme Blog: Stories, Tutorials,
+   Releases`, and bare domains like `skyliner.io`.
+5. **Stale-cleanup on re-run.** When a file already has a junk
+   description on disk (from an earlier pass), the body is reverted to
+   `summary` and the title/keywords from that pass are dropped before
+   the new fetch runs. The cleanups persist even if the new fetch
+   fails.
+
+#### What still needs a human
+
+- **Dead origin + no Wayback snapshot.** When both fail, the entry
+  keeps its original blurb in `description` and minimal frontmatter.
+- **Rebrand redirects** (`stackdriver.com` → Google Observability)
+  where the new page reads as a coherent product description, so the
+  junk-description regexes don't catch it. Hand-edit when you spot one.
+- **PDF sources.** Currently fetched as bytes and ignored by the HTML
+  extractor. Worth a follow-up to download and parse text.
 
 ## Contributing
 

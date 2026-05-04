@@ -18,20 +18,24 @@ import (
 
 // Postmortem is a postmortem summary plus its metadata.
 //
-// StartTime and EndTime together describe the "Event Date Period" the
-// postmortem is about (the from/to of the incident itself). Either may
-// be the zero value to indicate that bound is unknown.
+// StartTime/EndTime bound the incident itself (either may be zero).
+// Source* and ArchiveURL are populated by the `enrich` tool. Summary
+// holds the original blurb when the description gets rewritten.
 type Postmortem struct {
-	UUID        string    `yaml:"uuid"`
-	URL         string    `yaml:"url"`
-	Title       string    `yaml:"title,omitempty"`
-	StartTime   time.Time `yaml:"start_time,omitempty"`
-	EndTime     time.Time `yaml:"end_time,omitempty"`
-	Categories  []string  `yaml:"categories"`
-	Keywords    []string  `yaml:"keywords,omitempty"`
-	Company     string    `yaml:"company"`
-	Product     string    `yaml:"product"`
-	Description string    `yaml:"-"`
+	UUID              string    `yaml:"uuid"`
+	URL               string    `yaml:"url"`
+	ArchiveURL        string    `yaml:"archive_url,omitempty"`
+	Title             string    `yaml:"title,omitempty"`
+	StartTime         time.Time `yaml:"start_time,omitempty"`
+	EndTime           time.Time `yaml:"end_time,omitempty"`
+	Categories        []string  `yaml:"categories"`
+	Keywords          []string  `yaml:"keywords,omitempty"`
+	Company           string    `yaml:"company"`
+	Product           string    `yaml:"product"`
+	SourcePublishedAt time.Time `yaml:"source_published_at,omitempty"`
+	SourceFetchedAt   time.Time `yaml:"source_fetched_at,omitempty"`
+	Summary           string    `yaml:"summary,omitempty"`
+	Description       string    `yaml:"-"`
 }
 
 // HasEventDates reports whether the postmortem has any event date
@@ -138,8 +142,24 @@ func Parse(f io.Reader) (*Postmortem, error) {
 		return nil, fmt.Errorf("end_time: %w", err)
 	}
 
+	if t, err := parseFrontmatterTime(fm["source_published_at"]); err == nil {
+		p.SourcePublishedAt = t
+	} else {
+		return nil, fmt.Errorf("source_published_at: %w", err)
+	}
+
+	if t, err := parseFrontmatterTime(fm["source_fetched_at"]); err == nil {
+		p.SourceFetchedAt = t
+	} else {
+		return nil, fmt.Errorf("source_fetched_at: %w", err)
+	}
+
 	if url, ok := fm["url"].(string); ok {
 		p.URL = url
+	}
+
+	if archiveURL, ok := fm["archive_url"].(string); ok {
+		p.ArchiveURL = archiveURL
 	}
 
 	if title, ok := fm["title"].(string); ok {
@@ -152,6 +172,10 @@ func Parse(f io.Reader) (*Postmortem, error) {
 
 	if product, ok := fm["product"].(string); ok {
 		p.Product = product
+	}
+
+	if summary, ok := fm["summary"].(string); ok {
+		p.Summary = summary
 	}
 
 	if cats, ok := fm["categories"].([]interface{}); ok {
