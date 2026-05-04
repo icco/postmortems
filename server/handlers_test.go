@@ -129,6 +129,14 @@ func TestHealthzCheckHandler(t *testing.T) {
 	}
 }
 
+const (
+	testUUID        = "01494547-7ee9-4169-a0c0-d921fa309d83"
+	testURL         = "http://community.eveonline.com/news/dev-blogs/about-the-boot.ini-issue/"
+	testCompany     = "CCP Games"
+	testCategory    = "postmortem"
+	testDescription = "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)"
+)
+
 func TestLoadPostmortem(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -138,13 +146,13 @@ func TestLoadPostmortem(t *testing.T) {
 	}{
 		{
 			name:     "successfully loading postmortem",
-			filename: "01494547-7ee9-4169-a0c0-d921fa309d83.md",
+			filename: testUUID + ".md",
 			want: &postmortems.Postmortem{
-				UUID:        "01494547-7ee9-4169-a0c0-d921fa309d83",
-				URL:         "http://community.eveonline.com/news/dev-blogs/about-the-boot.ini-issue/",
-				Company:     "CCP Games",
-				Categories:  []string{"postmortem"},
-				Description: "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)",
+				UUID:        testUUID,
+				URL:         testURL,
+				Company:     testCompany,
+				Categories:  []string{testCategory},
+				Description: testDescription,
 			},
 			wantErr: false,
 		},
@@ -185,11 +193,11 @@ func TestLoadPostmortems(t *testing.T) {
 			dir:  "../testdata",
 			want: []*postmortems.Postmortem{
 				&postmortems.Postmortem{
-					UUID:        "01494547-7ee9-4169-a0c0-d921fa309d83",
-					URL:         "http://community.eveonline.com/news/dev-blogs/about-the-boot.ini-issue/",
-					Company:     "CCP Games",
-					Categories:  []string{"postmortem"},
-					Description: "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)"},
+					UUID:        testUUID,
+					URL:         testURL,
+					Company:     testCompany,
+					Categories:  []string{testCategory},
+					Description: testDescription},
 			},
 			wantErr: false,
 		},
@@ -230,11 +238,11 @@ func TestGetPosmortemByCategory(t *testing.T) {
 			category: "postmortem",
 			pms: []*postmortems.Postmortem{
 				&postmortems.Postmortem{
-					UUID:        "01494547-7ee9-4169-a0c0-d921fa309d83",
-					URL:         "http://community.eveonline.com/news/dev-blogs/about-the-boot.ini-issue/",
-					Company:     "CCP Games",
-					Categories:  []string{"postmortem"},
-					Description: "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)",
+					UUID:        testUUID,
+					URL:         testURL,
+					Company:     testCompany,
+					Categories:  []string{testCategory},
+					Description: testDescription,
 				},
 				&postmortems.Postmortem{
 					UUID:        "0ea35968-4578-408c-b4fd-8c6ccc3501b0",
@@ -246,11 +254,11 @@ func TestGetPosmortemByCategory(t *testing.T) {
 			},
 			want: []postmortems.Postmortem{
 				postmortems.Postmortem{
-					UUID:        "01494547-7ee9-4169-a0c0-d921fa309d83",
-					URL:         "http://community.eveonline.com/news/dev-blogs/about-the-boot.ini-issue/",
-					Company:     "CCP Games",
-					Categories:  []string{"postmortem"},
-					Description: "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)",
+					UUID:        testUUID,
+					URL:         testURL,
+					Company:     testCompany,
+					Categories:  []string{testCategory},
+					Description: testDescription,
 				},
 			},
 		},
@@ -259,11 +267,11 @@ func TestGetPosmortemByCategory(t *testing.T) {
 			category: "not-valid",
 			pms: []*postmortems.Postmortem{
 				&postmortems.Postmortem{
-					UUID:        "01494547-7ee9-4169-a0c0-d921fa309d83",
-					URL:         "http://community.eveonline.com/news/dev-blogs/about-the-boot.ini-issue/",
-					Company:     "CCP Games",
-					Categories:  []string{"postmortem"},
-					Description: "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)",
+					UUID:        testUUID,
+					URL:         testURL,
+					Company:     testCompany,
+					Categories:  []string{testCategory},
+					Description: testDescription,
 				},
 				&postmortems.Postmortem{
 					UUID:        "0ea35968-4578-408c-b4fd-8c6ccc3501b0",

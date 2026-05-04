@@ -67,7 +67,7 @@ func ExtractPostmortems(loc string, dir string) error {
 			pm.URL = matches[2]
 			pm.Company = matches[1]
 			pm.Description = matches[3]
-			pm.Categories = []string{"postmortem"}
+			pm.Categories = []string{categoryPostmortem}
 		}
 
 		// See if there is an existing one.

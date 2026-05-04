@@ -22,7 +22,7 @@ func TestParse(t *testing.T) {
 				UUID:        "01494547-7ee9-4169-a0c0-d921fa309d83",
 				URL:         "http://community.eveonline.com/news/dev-blogs/about-the-boot.ini-issue/",
 				Company:     "CCP Games",
-				Categories:  []string{"postmortem"},
+				Categories:  []string{categoryPostmortem},
 				Description: "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)",
 			},
 			wantErr: false,

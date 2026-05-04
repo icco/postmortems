@@ -28,6 +28,8 @@ type Postmortem struct {
 	Description string    `yaml:"-"`
 }
 
+const categoryPostmortem = "postmortem"
+
 var (
 	// Categories is a whitelist of valid categories that a postmortem can have.
 	Categories = []string{
@@ -35,7 +37,7 @@ var (
 		"cascading-failure",
 		"cloud",
 		"config-change",
-		"postmortem",
+		categoryPostmortem,
 		"hardware",
 		"security",
 		"time",
