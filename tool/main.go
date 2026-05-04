@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -64,6 +65,14 @@ var (
 				Default:  catPostmortem,
 				PageSize: len(postmortems.Categories),
 			},
+		},
+		{
+			Name: "keywords",
+			Prompt: &survey.Input{
+				Message: "Keywords (optional, comma-separated):",
+				Help:    "Free-form tags, e.g. \"dns, bgp, eu-west-1\". Leave blank for none.",
+			},
+			Transform: keywordsTransformer,
 		},
 	}
 )
@@ -200,6 +209,39 @@ func newPostmortem(dir string) error {
 	}
 
 	return pm.Save(dir)
+}
+
+// keywordsTransformer turns a comma-separated string entered into a
+// survey.Input into a []string with whitespace trimmed and empty entries
+// dropped, so the result can be assigned directly into the Keywords
+// slice via survey.Ask.
+func keywordsTransformer(ans interface{}) interface{} {
+	str, ok := ans.(string)
+	if !ok {
+		return ans
+	}
+	var out []string
+	for _, raw := range splitAndTrim(str, ",") {
+		if raw == "" {
+			continue
+		}
+		out = append(out, raw)
+	}
+	return out
+}
+
+// splitAndTrim splits s on sep and trims whitespace from each element.
+// Defined here rather than pulling in strings.Split + a loop in two
+// places to keep the keyword handling self-contained.
+func splitAndTrim(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, sep)
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+	return parts
 }
 
 // IsURL validates that a value parses as an absolute URL.

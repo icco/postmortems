@@ -28,6 +28,7 @@ type Postmortem struct {
 	StartTime   time.Time `yaml:"start_time,omitempty"`
 	EndTime     time.Time `yaml:"end_time,omitempty"`
 	Categories  []string  `yaml:"categories"`
+	Keywords    []string  `yaml:"keywords,omitempty"`
 	Company     string    `yaml:"company"`
 	Product     string    `yaml:"product"`
 	Description string    `yaml:"-"`
@@ -157,6 +158,14 @@ func Parse(f io.Reader) (*Postmortem, error) {
 		for _, c := range cats {
 			if cat, ok := c.(string); ok {
 				p.Categories = append(p.Categories, cat)
+			}
+		}
+	}
+
+	if kws, ok := fm["keywords"].([]interface{}); ok {
+		for _, k := range kws {
+			if kw, ok := k.(string); ok {
+				p.Keywords = append(p.Keywords, kw)
 			}
 		}
 	}

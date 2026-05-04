@@ -54,6 +54,35 @@ func TestParse(t *testing.T) {
 	}
 }
 
+func TestParseKeywords(t *testing.T) {
+	t.Parallel()
+
+	const body = `---
+uuid: "abc"
+url: "https://example.com/postmortem"
+company: "Example Inc"
+categories:
+- postmortem
+keywords:
+- dns
+- eu-west-1
+- "bgp leak"
+
+---
+
+Example body.
+`
+
+	got, err := Parse(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	want := []string{"dns", "eu-west-1", "bgp leak"}
+	if diff := cmp.Diff(got.Keywords, want); diff != "" {
+		t.Errorf("Keywords mismatch (-got +want):\n%s", diff)
+	}
+}
+
 func TestParseTitle(t *testing.T) {
 	t.Parallel()
 
@@ -78,6 +107,7 @@ Example body.
 		t.Errorf("Title = %q, want %q", got.Title, "Example outage of 2024")
 	}
 }
+
 
 func TestEventDatePeriod(t *testing.T) {
 	t.Parallel()
