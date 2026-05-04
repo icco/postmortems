@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -82,6 +83,75 @@ func TestMetricsEndpoint(t *testing.T) {
 			t.Errorf("metrics body missing %q\nbody:\n%s", want, text)
 		}
 	}
+}
+
+func TestNotFoundHandler(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(cwd); err != nil {
+			t.Logf("chdir back: %v", err)
+		}
+	})
+	if err := os.Chdir(".."); err != nil {
+		t.Fatalf("chdir to repo root: %v", err)
+	}
+
+	h := New(Options{Logger: zap.NewNop().Sugar()})
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+
+	t.Run("unknown path returns styled 404", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/this-route-does-not-exist") //nolint:noctx // test
+		if err != nil {
+			t.Fatalf("get: %v", err)
+		}
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Logf("close body: %v", err)
+			}
+		}()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", resp.StatusCode)
+		}
+		if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+			t.Errorf("content-type = %q, want text/html", ct)
+		}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if !strings.Contains(string(body), "404") || !strings.Contains(string(body), "Not Found") {
+			t.Errorf("body missing 404 marker; got:\n%s", body)
+		}
+		if !strings.Contains(string(body), "Postmortem Index") {
+			t.Errorf("body missing layout header; got:\n%s", body)
+		}
+	})
+
+	t.Run("missing postmortem returns styled 404", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/postmortem/00000000-0000-0000-0000-000000000000") //nolint:noctx // test
+		if err != nil {
+			t.Fatalf("get: %v", err)
+		}
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Logf("close body: %v", err)
+			}
+		}()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", resp.StatusCode)
+		}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if !strings.Contains(string(body), "Not Found") {
+			t.Errorf("body missing 404 marker; got:\n%s", body)
+		}
+	})
 }
 
 func TestHealthzCheckHandler(t *testing.T) {
