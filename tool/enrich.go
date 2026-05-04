@@ -68,6 +68,23 @@ func EnrichPostmortems(ctx context.Context, opts enrichOptions) ([]enrichResult,
 		return nil, fmt.Errorf("read dir: %w", err)
 	}
 
+	var paths []string
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		name := f.Name()
+		if !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		if opts.Only != "" && !strings.HasPrefix(name, opts.Only) {
+			continue
+		}
+		paths = append(paths, filepath.Join(opts.Dir, name))
+	}
+	total := len(paths)
+	opts.Logger.Info("enrich starting", "files", total, "workers", opts.Concurrency, "apply", opts.Apply)
+
 	fetcher := NewFetcher(opts.HTTPTimeout)
 
 	jobs := make(chan string)
@@ -85,27 +102,20 @@ func EnrichPostmortems(ctx context.Context, opts enrichOptions) ([]enrichResult,
 	}
 
 	go func() {
-		for _, f := range files {
-			if f.IsDir() {
-				continue
-			}
-			name := f.Name()
-			if !strings.HasSuffix(name, ".md") {
-				continue
-			}
-			if opts.Only != "" && !strings.HasPrefix(name, opts.Only) {
-				continue
-			}
-			jobs <- filepath.Join(opts.Dir, name)
+		for _, p := range paths {
+			jobs <- p
 		}
 		close(jobs)
 		wg.Wait()
 		close(results)
 	}()
 
-	var out []enrichResult
+	out := make([]enrichResult, 0, total)
+	done := 0
 	for r := range results {
+		done++
 		out = append(out, r)
+		logEnrichProgress(opts.Logger, r, done, total, opts.Apply)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
 	return out, nil
@@ -292,56 +302,82 @@ func firstNonEmpty(s ...string) string {
 	return ""
 }
 
-// LogEnrichReport emits one slog event per result plus a summary.
+// errKind classifies an enrichResult error for counting/labelling.
+func errKind(err error) string {
+	if err == nil {
+		return ""
+	}
+	switch {
+	case strings.HasPrefix(err.Error(), "fetch:"):
+		return "fetch"
+	case strings.HasPrefix(err.Error(), "llm:"):
+		return "llm"
+	default:
+		return "error"
+	}
+}
+
+// logEnrichProgress emits one streaming event per completed file with a
+// done/total counter so long runs show progress.
+func logEnrichProgress(logger *slog.Logger, r enrichResult, done, total int, apply bool) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	base := filepath.Base(r.Path)
+	switch {
+	case r.Skipped != "":
+		logger.Info("enrich progress",
+			"done", done, "total", total,
+			"file", base, "outcome", "skipped", "reason", r.Skipped,
+		)
+	case r.Err != nil:
+		logger.Error("enrich progress",
+			"done", done, "total", total,
+			"file", base, "url", r.URL,
+			"outcome", "error", "kind", errKind(r.Err), "err", r.Err,
+		)
+	case len(r.Changed) == 0:
+		logger.Info("enrich progress",
+			"done", done, "total", total,
+			"file", base, "url", r.URL, "outcome", "no-op",
+		)
+	default:
+		logger.Info("enrich progress",
+			"done", done, "total", total,
+			"file", base, "url", r.URL,
+			"outcome", "updated", "applied", apply,
+			"used_archive", r.UsedArchive, "confidence", r.Confidence,
+			"changed", r.Changed,
+		)
+	}
+}
+
+// LogEnrichReport emits a final summary for a finished enrich run.
+// Per-file events are streamed live by EnrichPostmortems via
+// logEnrichProgress, so this only tallies counters.
 func LogEnrichReport(logger *slog.Logger, res []enrichResult, apply bool) {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	var (
-		processed    int
-		updated      int
-		fetchErrs    int
-		llmErrs      int
-		archiveCount int
-		skipped      int
-	)
+	var processed, updated, fetchErrs, llmErrs, archiveCount, skipped int
 	for _, r := range res {
 		processed++
-		base := filepath.Base(r.Path)
-		if r.Skipped != "" {
+		switch {
+		case r.Skipped != "":
 			skipped++
-			logger.Debug("enrich skipped", "file", base, "reason", r.Skipped)
-			continue
+		case r.Err != nil:
+			switch errKind(r.Err) {
+			case "fetch":
+				fetchErrs++
+			case "llm":
+				llmErrs++
+			}
+		case len(r.Changed) > 0:
+			updated++
 		}
 		if r.UsedArchive {
 			archiveCount++
 		}
-		if r.Err != nil {
-			kind := "error"
-			switch {
-			case strings.HasPrefix(r.Err.Error(), "fetch:"):
-				fetchErrs++
-				kind = "fetch"
-			case strings.HasPrefix(r.Err.Error(), "llm:"):
-				llmErrs++
-				kind = "llm"
-			}
-			logger.Error("enrich failed", "file", base, "url", r.URL, "kind", kind, "err", r.Err)
-			continue
-		}
-		if len(r.Changed) == 0 {
-			logger.Debug("enrich no-op", "file", base, "url", r.URL)
-			continue
-		}
-		updated++
-		logger.Info("enriched",
-			"file", base,
-			"url", r.URL,
-			"applied", apply,
-			"used_archive", r.UsedArchive,
-			"confidence", r.Confidence,
-			"changed", r.Changed,
-		)
 	}
 	logger.Info("enrich summary",
 		"processed", processed,
