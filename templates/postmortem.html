@@ -1,35 +1,56 @@
-{{define "title"}}{{ range .Postmortems }}{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }} Postmortem{{ end }}{{ end }}{{end}}
+{{define "title"}}{{ range .Postmortems }}{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }} Postmortem{{ end }}{{ end }} | postmortems.app{{end}}
 
 {{define "body"}}
-<article class="pa3 pa5-ns mw8 center">
+<article class="max-w-3xl mx-auto px-4 py-8">
   {{ range .Postmortems }}
-  <h1 class="f3 f2-m f1-l">{{ if .Title }}{{ .Title }}{{ else }}<a href="/company/{{ companySlug .Company }}">{{ .Company }}</a>{{ end }}</h1>
-  {{ if .Title }}
-  <h2 class="f5 f4-l fw4 mt0"><a href="/company/{{ companySlug .Company }}">{{ .Company }}</a></h2>
-  {{ end }}
-  {{ if .EventDatePeriod }}
-  <p class="lh-copy mt0"><strong>Event date:</strong> {{ .EventDatePeriod }}</p>
-  {{ end }}
-  <ul>
-    {{ range .Categories }}
-    <li><a href="/category/{{ . }}">{{ . }}</a></li>
-    {{end}}
-  </ul>
+  <div class="text-sm breadcrumbs mb-4 text-base-content/60">
+    <ul>
+      <li><a href="/" class="link link-hover">Index</a></li>
+      <li><a href="/company/{{ companySlug .Company }}" class="link link-hover">{{ .Company }}</a></li>
+      <li class="truncate max-w-[18ch] sm:max-w-none">{{ if .Title }}{{ .Title }}{{ else }}Postmortem{{ end }}</li>
+    </ul>
+  </div>
 
-  <p class="lh-copy">
+  <header class="mb-6">
+    <h1 class="text-3xl md:text-4xl font-semibold leading-tight">
+      {{ if .Title }}{{ .Title }}{{ else }}<a class="link link-hover" href="/company/{{ companySlug .Company }}">{{ .Company }}</a>{{ end }}
+    </h1>
+    {{ if .Title }}
+    <p class="mt-2 text-lg text-base-content/70">
+      <a class="link link-hover" href="/company/{{ companySlug .Company }}">{{ .Company }}</a>
+      {{ if .Product }}<span class="opacity-60"> &middot; {{ .Product }}</span>{{ end }}
+    </p>
+    {{ end }}
+    <div class="mt-4 flex flex-wrap items-center gap-2 text-sm">
+      {{ if .EventDatePeriod }}
+      <span class="badge badge-soft">{{ .EventDatePeriod }}</span>
+      {{ end }}
+      {{ range .Categories }}
+      <a href="/category/{{ . }}" class="badge badge-outline capitalize hover:badge-primary">{{ . }}</a>
+      {{end}}
+    </div>
+  </header>
+
+  <div class="prose prose-sm md:prose-base max-w-none">
     {{ .Description }}
-  </p>
+  </div>
+
   {{ if .Keywords }}
-  <p class="lh-copy">
-    <strong>Keywords:</strong>
-    {{ range $i, $k := .Keywords }}{{ if $i }}, {{ end }}<span class="keyword">{{ $k }}</span>{{ end }}
-  </p>
+  <section class="mt-8">
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 mb-2">Keywords</h2>
+    <div class="flex flex-wrap gap-1.5">
+      {{ range .Keywords }}<span class="badge badge-ghost badge-sm">{{ . }}</span>{{ end }}
+    </div>
+  </section>
   {{ end }}
-  <small>
-    <a href="{{ .URL }}" target="_blank">Source</a> |
-    <a href="https://github.com/icco/postmortems/blob/master/data/{{ .UUID }}.md" target="_blank">Edit Metadata</a> |
-    <a href="{{ .UUID }}.json" target="_blank">JSON file</a>
-  </small>
+
+  <footer class="mt-10 pt-6 border-t border-base-300 text-sm text-base-content/70">
+    <div class="flex flex-wrap gap-4 items-center">
+      <a class="link link-hover" href="{{ .URL }}" target="_blank" rel="noopener">Source &rarr;</a>
+      <a class="link link-hover" href="https://github.com/icco/postmortems/blob/main/data/{{ .UUID }}.md" target="_blank" rel="noopener">Edit metadata</a>
+      <a class="link link-hover" href="{{ .UUID }}.json" target="_blank" rel="noopener">JSON</a>
+    </div>
+  </footer>
   {{ end }}
 </article>
 {{end}}

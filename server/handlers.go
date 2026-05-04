@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -23,6 +25,17 @@ import (
 
 // serverName is the otelhttp span/metric scope.
 const serverName = "postmortems"
+
+// reportdHost is the live host that receives Web Vitals + browser
+// security reports for postmortems.app. The {service} segment is
+// reportdService.
+//
+// See https://reportd.natwelch.com (icco/reportd) and
+// templates/layout.html for the matching client snippet.
+const (
+	reportdHost    = "https://reportd.natwelch.com"
+	reportdService = "postmortems"
+)
 
 // Options configures the HTTP router. MetricsHandler is mounted at /metrics.
 type Options struct {
@@ -64,6 +77,7 @@ func New(opts Options) http.Handler {
 	r := chi.NewRouter()
 	r.Use(logging.Middleware(opts.Logger.Desugar()))
 	r.Use(routeTag)
+	r.Use(securityHeaders)
 
 	compressor := middleware.NewCompressor(flate.DefaultCompression)
 	r.Use(compressor.Handler)
@@ -105,6 +119,56 @@ func routeTag(next http.Handler) http.Handler {
 		if pattern := chi.RouteContext(r.Context()).RoutePattern(); pattern != "" {
 			labeler.Add(semconv.HTTPRoute(pattern))
 		}
+	})
+}
+
+// securityHeaders attaches Reporting-API + CSP headers to every
+// response. Browser violations land at reportd.natwelch.com (via the
+// `default` reporting group); Web Vitals are pushed by the inline
+// snippet in templates/layout.html.
+//
+// The CSP is intentionally permissive (allows the Tailwind/daisyUI
+// CDN, the unpkg-hosted web-vitals module, and inline scripts) so the
+// existing pages keep working. Tighten by enumerating hashes/nonces if
+// the inline scripts ever stabilise.
+func securityHeaders(next http.Handler) http.Handler {
+	reportEndpoint := reportdHost + "/report/" + reportdService
+	reportingEndpoint := reportdHost + "/reporting/" + reportdService
+
+	csp := strings.Join([]string{
+		"default-src 'self'",
+		"script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
+		"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+		"img-src 'self' data:",
+		"font-src 'self' data: https://cdn.jsdelivr.net",
+		"connect-src 'self' " + reportdHost,
+		"object-src 'none'",
+		"base-uri 'self'",
+		"frame-ancestors 'none'",
+		"report-uri " + reportEndpoint,
+		"report-to default",
+	}, "; ")
+
+	reportTo := `{"group":"default","max_age":10886400,"endpoints":[{"url":"` + reportEndpoint + `"}]}`
+	reportingEndpoints := `default="` + reportingEndpoint + `"`
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip the runtime/operational endpoints; they're not
+		// rendered in a browser and shouldn't pay the header tax.
+		switch r.URL.Path {
+		case "/healthz", "/metrics":
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		h := w.Header()
+		h.Set("Content-Security-Policy", csp)
+		h.Set("Reporting-Endpoints", reportingEndpoints)
+		h.Set("Report-To", reportTo)
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		h.Set("X-Content-Type-Options", "nosniff")
+
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -157,7 +221,11 @@ func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
 // templateFuncs are made available to every template parsed by
 // renderTemplate.
 var templateFuncs = template.FuncMap{
-	"companySlug": CompanySlug,
+	"companySlug":    CompanySlug,
+	"categoryDesc":   describeCategory,
+	"categoryEmoji":  categoryEmoji,
+	"prettifyText":   prettifyText,
+	"firstNonEmpty":  firstNonEmpty,
 }
 
 // renderTemplate parses layout.html + view and writes the response.
@@ -195,7 +263,7 @@ func notFoundHandler(w http.ResponseWriter, r *http.Request) {
 	lp := filepath.Join("templates", "layout.html")
 	fp := filepath.Join("templates", "404.html")
 
-	tmpl, err := template.ParseFiles(lp, fp)
+	tmpl, err := template.New("layout.html").Funcs(templateFuncs).ParseFiles(lp, fp)
 	if err != nil {
 		l.Errorw("404 template parse error", zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
@@ -274,6 +342,194 @@ func getPostmortemsByCompanySlug(pms []*postmortems.Postmortem, slug string) []p
 	return out
 }
 
+// labeledCount is a (name, count) pair used to render top-N lists in
+// the templates (categories on a company page, companies on a category
+// page) without forcing the templates to know how to sort maps.
+type labeledCount struct {
+	Name  string
+	Slug  string // optional; populated for company entries
+	Count int
+}
+
+// dateRange tracks the min/max event dates across a set of postmortems
+// so the company and category pages can show "incidents from X to Y"
+// headers.
+type dateRange struct {
+	Earliest time.Time
+	Latest   time.Time
+	HasAny   bool
+}
+
+func (d dateRange) String() string {
+	if !d.HasAny {
+		return ""
+	}
+	const layout = "Jan 2006"
+	es, ls := d.Earliest.Format(layout), d.Latest.Format(layout)
+	if es == ls {
+		return es
+	}
+	return es + " \u2013 " + ls
+}
+
+// SpanYears returns the number of distinct calendar years covered by
+// the range, or 0 if no dates are known.
+func (d dateRange) SpanYears() int {
+	if !d.HasAny {
+		return 0
+	}
+	return d.Latest.Year() - d.Earliest.Year() + 1
+}
+
+func computeDateRange(pms []postmortems.Postmortem) dateRange {
+	var dr dateRange
+	consider := func(t time.Time) {
+		if t.IsZero() {
+			return
+		}
+		if !dr.HasAny {
+			dr.Earliest, dr.Latest, dr.HasAny = t, t, true
+			return
+		}
+		if t.Before(dr.Earliest) {
+			dr.Earliest = t
+		}
+		if t.After(dr.Latest) {
+			dr.Latest = t
+		}
+	}
+	for _, pm := range pms {
+		consider(pm.StartTime)
+		consider(pm.EndTime)
+	}
+	return dr
+}
+
+// topLabeledCounts returns counts for unique values keyed by name,
+// sorted by count descending and then name ascending. Limit caps the
+// returned slice; pass 0 to return everything.
+func topLabeledCounts(counts map[string]int, limit int) []labeledCount {
+	out := make([]labeledCount, 0, len(counts))
+	for k, v := range counts {
+		if k == "" {
+			continue
+		}
+		out = append(out, labeledCount{Name: k, Count: v})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+// topCompanies returns up to limit company entries ordered by
+// postmortem count descending, with their canonical slug attached so
+// templates can link without re-deriving it.
+func topCompanies(counts map[string]int, limit int) []labeledCount {
+	out := topLabeledCounts(counts, limit)
+	for i := range out {
+		out[i].Slug = CompanySlug(out[i].Name)
+	}
+	return out
+}
+
+// sortPostmortems orders postmortems by event date descending (most
+// recent first), with undated entries pushed to the bottom and
+// deterministically secondary-sorted by title/company.
+func sortPostmortems(pms []postmortems.Postmortem) {
+	sort.SliceStable(pms, func(i, j int) bool {
+		ai, aj := pms[i].StartTime, pms[j].StartTime
+		switch {
+		case !ai.IsZero() && aj.IsZero():
+			return true
+		case ai.IsZero() && !aj.IsZero():
+			return false
+		case !ai.IsZero() && !aj.IsZero() && !ai.Equal(aj):
+			return ai.After(aj)
+		}
+		ki := strings.ToLower(firstNonEmpty(pms[i].Title, pms[i].Company))
+		kj := strings.ToLower(firstNonEmpty(pms[j].Title, pms[j].Company))
+		return ki < kj
+	})
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// prettifyText turns slugs like "cascading-failure" into "Cascading
+// Failure" for headings. Already-capitalised input is preserved.
+func prettifyText(s string) string {
+	s = strings.ReplaceAll(s, "-", " ")
+	s = strings.ReplaceAll(s, "_", " ")
+	parts := strings.Fields(s)
+	for i, p := range parts {
+		if p == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(p[:1]) + p[1:]
+	}
+	return strings.Join(parts, " ")
+}
+
+// categoryDescriptions provides human-readable blurbs for the category
+// page header. Categories without an entry get a generic fallback.
+var categoryDescriptions = map[string]string{
+	"automation":        "Incidents caused or amplified by automated systems acting incorrectly, too aggressively, or without enough human review.",
+	"cascading-failure": "One small failure that snowballed: retries, thundering herds, or thread pool exhaustion that took out adjacent services.",
+	"cloud":             "Outages of, or caused by, public cloud providers (AWS, GCP, Azure, etc.) and their managed services.",
+	"config-change":     "Bad configuration pushed to production: feature flags, network ACLs, IAM policies, build settings, and routing rules.",
+	"postmortem":        "All entries with a published post-incident review. The default category every postmortem belongs to.",
+	"hardware":          "Disks, NICs, power, cooling, fibre cuts, and other physical-layer faults that took systems offline.",
+	"security":          "Outages caused by security incidents, mitigations, or hardening rollouts (revoked certs, blocked traffic, expired credentials).",
+	"time":              "NTP, leap seconds, timezone bugs, clock drift, and timestamp serialisation issues.",
+	"undescriptive":     "Brief blurbs without enough text to categorise meaningfully \u2014 candidates for follow-up enrichment.",
+}
+
+func describeCategory(c string) string {
+	if d, ok := categoryDescriptions[c]; ok {
+		return d
+	}
+	return "Postmortems tagged with \"" + c + "\"."
+}
+
+// categoryEmoji returns a small visual cue per category so headers
+// have something to anchor the eye. Falls back to a generic icon.
+func categoryEmoji(c string) string {
+	switch c {
+	case "automation":
+		return "\U0001F916" // robot
+	case "cascading-failure":
+		return "\U0001F30A" // wave
+	case "cloud":
+		return "\u2601\uFE0F" // cloud
+	case "config-change":
+		return "\u2699\uFE0F" // gear
+	case "hardware":
+		return "\U0001F5A5\uFE0F" // desktop
+	case "security":
+		return "\U0001F512" // lock
+	case "time":
+		return "\u23F1\uFE0F" // stopwatch
+	case "postmortem":
+		return "\U0001F4D6" // book
+	case "undescriptive":
+		return "\u2754" // white question mark
+	}
+	return "\U0001F4DD" // memo
+}
+
 func companyPageHandler(dir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		l := logging.FromContext(r.Context())
@@ -292,16 +548,38 @@ func companyPageHandler(dir string) http.HandlerFunc {
 			return
 		}
 
+		sortPostmortems(matches)
+
+		categoryCounts := map[string]int{}
+		productCounts := map[string]int{}
+		for _, pm := range matches {
+			for _, c := range pm.Categories {
+				categoryCounts[c]++
+			}
+			if pm.Product != "" {
+				productCounts[pm.Product]++
+			}
+		}
+		dr := computeDateRange(matches)
+
 		page := struct {
-			Company     string
-			Slug        string
-			Categories  []string
-			Postmortems []postmortems.Postmortem
+			Company        string
+			Slug           string
+			Categories     []string
+			CategoryCounts []labeledCount
+			Products       []labeledCount
+			DateRange      string
+			SpanYears      int
+			Postmortems    []postmortems.Postmortem
 		}{
-			Company:     matches[0].Company,
-			Slug:        slug,
-			Categories:  postmortems.Categories,
-			Postmortems: matches,
+			Company:        matches[0].Company,
+			Slug:           slug,
+			Categories:     postmortems.Categories,
+			CategoryCounts: topLabeledCounts(categoryCounts, 0),
+			Products:       topLabeledCounts(productCounts, 6),
+			DateRange:      dr.String(),
+			SpanYears:      dr.SpanYears(),
+			Postmortems:    matches,
 		}
 
 		renderTemplate(w, r, "company.html", page)
@@ -320,14 +598,52 @@ func categoryPageHandler(dir string) http.HandlerFunc {
 			return
 		}
 
+		matches := getPosmortemByCategory(pms, ct)
+		sortPostmortems(matches)
+
+		companyCounts := map[string]int{}
+		keywordCounts := map[string]int{}
+		coCategoryCounts := map[string]int{}
+		for _, pm := range matches {
+			if pm.Company != "" {
+				companyCounts[pm.Company]++
+			}
+			for _, kw := range pm.Keywords {
+				keywordCounts[strings.ToLower(kw)]++
+			}
+			for _, c := range pm.Categories {
+				if c == ct {
+					continue
+				}
+				coCategoryCounts[c]++
+			}
+		}
+		dr := computeDateRange(matches)
+
 		page := struct {
-			Category    string
-			Categories  []string
-			Postmortems []postmortems.Postmortem
+			Category       string
+			Description    string
+			Emoji          string
+			Categories     []string
+			Companies      []labeledCount
+			Keywords       []labeledCount
+			CoCategories   []labeledCount
+			DateRange      string
+			SpanYears      int
+			TotalCompanies int
+			Postmortems    []postmortems.Postmortem
 		}{
-			Category:    ct,
-			Categories:  postmortems.Categories,
-			Postmortems: getPosmortemByCategory(pms, ct),
+			Category:       ct,
+			Description:    describeCategory(ct),
+			Emoji:          categoryEmoji(ct),
+			Categories:     postmortems.Categories,
+			Companies:      topCompanies(companyCounts, 8),
+			Keywords:       topLabeledCounts(keywordCounts, 16),
+			CoCategories:   topLabeledCounts(coCategoryCounts, 6),
+			DateRange:      dr.String(),
+			SpanYears:      dr.SpanYears(),
+			TotalCompanies: len(companyCounts),
+			Postmortems:    matches,
 		}
 
 		renderTemplate(w, r, "category.html", page)
