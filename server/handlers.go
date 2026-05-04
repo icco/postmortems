@@ -28,22 +28,13 @@ import (
 	"go.uber.org/zap"
 )
 
-// canonicalBase is the production origin used to build canonical
-// links and Open Graph URLs regardless of which host served the
-// request.
+// canonicalBase is the public origin used for canonical links and og:url.
 var canonicalBase = url.URL{Scheme: "https", Host: "postmortems.app"}
 
-// siteTagline is the default <meta name="description"> / og:description
-// shown when a page does not provide its own. It mirrors the wording on
-// /about so embeds without a more specific blurb still describe what
-// the site is.
 const siteTagline = "A public repository of incident reports with annotated metadata and summaries of public postmortem documents."
 
-// PageMeta carries per-page SEO/social metadata. Every handler that
-// renders a template must populate one and stick it on its page struct
-// as `Meta` so layout.html can build correct canonical/og:url/og:title
-// /og:description tags. Path is path-only with a leading "/"; absURL
-// turns it into an absolute URL rooted at canonicalBaseURL.
+// PageMeta is the per-page SEO/social metadata layout.html consumes as `.Meta`.
+// Path is site-relative; absURL turns it into a full canonical URL.
 type PageMeta struct {
 	Path        string
 	Title       string
@@ -51,15 +42,9 @@ type PageMeta struct {
 	OGType      string // "website" (default) or "article"
 }
 
-// serverName is the otelhttp span/metric scope.
 const serverName = "postmortems"
 
-// reportdHost is the live host that receives Web Vitals + browser
-// security reports for postmortems.app. The {service} segment is
-// reportdService.
-//
-// See https://reportd.natwelch.com (icco/reportd) and
-// templates/layout.html for the matching client snippet.
+// reportd receives Web Vitals + browser security reports. See https://reportd.natwelch.com.
 const (
 	reportdHost    = "https://reportd.natwelch.com"
 	reportdService = "postmortems"
@@ -72,8 +57,8 @@ type Options struct {
 	Dir            string
 }
 
-// postmortemView is a render-layer copy of Postmortem whose Description
-// is template.HTML so html/template emits pre-rendered Markdown verbatim.
+// postmortemView is a render-layer copy of Postmortem with Description as
+// pre-rendered HTML.
 type postmortemView struct {
 	UUID            string
 	URL             string
@@ -151,22 +136,11 @@ func routeTag(next http.Handler) http.Handler {
 	})
 }
 
-// reportEndpoint is the legacy Report-To URL.
-func reportEndpoint() string { return reportdHost + "/report/" + reportdService }
-
-// reportingEndpoint is the modern Reporting-API URL referenced by
-// `Reporting-Endpoints: default=...`.
+func reportEndpoint() string    { return reportdHost + "/report/" + reportdService }
 func reportingEndpoint() string { return reportdHost + "/reporting/" + reportdService }
 
-// reportingHeaders attaches the Reporting-API routing headers to
-// every response so browser-emitted CSP / Reporting-API / COOP / COEP
-// / permissions-policy violations land in reportd.natwelch.com.
-//
-// Mirrors the matching chi middleware in icco/reportd and
-// icco/inspiration so all of natwelch's services land their reports
-// the same way. `Content-Security-Policy` itself is set by
-// unrolled/secure (see secureOptions); this middleware only carries
-// the report-routing headers it doesn't model.
+// reportingHeaders sets Report-To and Reporting-Endpoints so browser
+// reports land in reportd. CSP itself is set by unrolled/secure.
 func reportingHeaders(next http.Handler) http.Handler {
 	reportTo := `{"group":"default","max_age":10886400,"endpoints":[{"url":"` + reportEndpoint() + `"}]}`
 	reportingEndpoints := `default="` + reportingEndpoint() + `"`
@@ -180,13 +154,8 @@ func reportingHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// secureOptions returns the unrolled/secure config used by the New()
-// router. The defaults follow the icco/reportd setup with one
-// addition: a CSP that opens the Tailwind 4 / daisyUI 5 CDN and the
-// unpkg-hosted web-vitals module, both of which the redesigned
-// templates/layout.html pulls in. CSP violations are reported to the
-// same reportd endpoint via `report-uri` (legacy) and `report-to
-// default` (modern), so they show up alongside everything else.
+// secureOptions matches the icco/reportd + icco/inspiration setup and opens the
+// CSP for the Tailwind/daisyUI CDN and the unpkg-hosted web-vitals module.
 func secureOptions() secure.Options {
 	csp := strings.Join([]string{
 		"default-src 'self'",
@@ -203,12 +172,11 @@ func secureOptions() secure.Options {
 	}, "; ")
 
 	return secure.Options{
-		// Cloud Run terminates TLS for us; trust the proxy so HSTS
-		// applies on the edge but we don't 301-loop ourselves
-		// locally.
+		// Cloud Run terminates TLS; trust X-Forwarded-Proto so HSTS fires at the
+		// edge instead of looping locally.
 		SSLRedirect:          false,
 		SSLProxyHeaders:      map[string]string{"X-Forwarded-Proto": "https"},
-		STSSeconds:           63072000, // two years
+		STSSeconds:           63072000, // 2 years
 		STSIncludeSubdomains: true,
 		STSPreload:           true,
 		ForceSTSHeader:       false,
@@ -269,8 +237,6 @@ func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
 	return pms, nil
 }
 
-// templateFuncs are made available to every template parsed by
-// renderTemplate.
 var templateFuncs = template.FuncMap{
 	"companySlug":   CompanySlug,
 	"categoryDesc":  describeCategory,
@@ -288,19 +254,13 @@ func absURL(p string) string {
 	return canonicalBase.JoinPath(p).String()
 }
 
-// markdownLinkRE matches a basic Markdown inline link `[text](url)`.
-// Used by plainText to keep the visible label and drop the URL when
-// building OG descriptions.
-var markdownLinkRE = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+var (
+	markdownLinkRE = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+	htmlTagRE      = regexp.MustCompile(`<[^>]+>`)
+)
 
-// htmlTagRE matches HTML tags so plainText can also accept already-
-// rendered descriptions and produce a clean text fragment.
-var htmlTagRE = regexp.MustCompile(`<[^>]+>`)
-
-// plainText turns a fragment of Markdown (or rendered HTML) into a
-// single line of human-readable text suitable for an OG description:
-// links collapse to their label, emphasis/code/heading markers are
-// stripped, and runs of whitespace collapse to single spaces.
+// plainText turns Markdown or rendered HTML into a single line of readable text
+// suitable for an OG description.
 func plainText(s string) string {
 	s = markdownLinkRE.ReplaceAllString(s, "$1")
 	s = htmlTagRE.ReplaceAllString(s, " ")
@@ -308,9 +268,8 @@ func plainText(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// truncateAtWord clips s to at most max runes on a word boundary,
-// appending an ellipsis when it had to cut. If the string is already
-// short enough it is returned unchanged.
+// truncateAtWord clips s to at most maxRunes on a word boundary, ellipsising
+// when it cuts.
 func truncateAtWord(s string, maxRunes int) string {
 	s = strings.TrimSpace(s)
 	if maxRunes <= 0 || utf8.RuneCountInString(s) <= maxRunes {
@@ -322,16 +281,12 @@ func truncateAtWord(s string, maxRunes int) string {
 		cut--
 	}
 	if cut == 0 {
-		// No whitespace within budget -- fall back to a hard cut so
-		// we still emit something rather than the whole string.
 		cut = maxRunes
 	}
 	return strings.TrimRight(string(runes[:cut]), " \t,.;:") + "\u2026"
 }
 
-// summarizeMarkdown produces an OG-friendly description from a
-// Markdown body: it strips the obvious syntax then truncates at a word
-// boundary. Empty in / empty out.
+// summarizeMarkdown returns an OG-friendly truncated plain-text summary.
 func summarizeMarkdown(md string, maxRunes int) string {
 	if strings.TrimSpace(md) == "" {
 		return ""
@@ -340,7 +295,6 @@ func summarizeMarkdown(md string, maxRunes int) string {
 }
 
 // renderTemplate parses layout.html + view and writes the response.
-// Uses html/template so {{ .Field }} interpolations are HTML-escaped.
 func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data any) {
 	l := logging.FromContext(r.Context())
 	lp := filepath.Join("templates", "layout.html")
@@ -366,9 +320,8 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data an
 	}
 }
 
-// notFoundHandler writes a styled HTML 404 page using the standard layout.
-// Falls back to plain text if the template fails to load so we always
-// emit some response.
+// notFoundHandler writes the styled 404 page, falling back to plain text on
+// template failure.
 func notFoundHandler(w http.ResponseWriter, r *http.Request) {
 	l := logging.FromContext(r.Context())
 	lp := filepath.Join("templates", "layout.html")
@@ -386,9 +339,7 @@ func notFoundHandler(w http.ResponseWriter, r *http.Request) {
 		Categories []string
 	}{
 		Meta: PageMeta{
-			// Path intentionally left empty: the 404 has no
-			// canonical URL of its own, so layout.html falls
-			// back to "/" which is harmless for crawlers.
+			// Empty Path so layout.html canonical falls back to "/".
 			Path:        "",
 			Title:       "404 \u2014 Not Found",
 			Description: "The page you were looking for could not be found.",
@@ -404,8 +355,8 @@ func notFoundHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// staticOrNotFound serves files from dir, falling back to the styled HTML
-// 404 page when a file does not exist (instead of FileServer's plain text).
+// staticOrNotFound serves files from dir, falling back to the styled 404 page
+// for missing paths.
 func staticOrNotFound(dir string) http.Handler {
 	fs := http.FileServer(http.Dir(dir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -433,9 +384,7 @@ func getPostmortemsByCategory(pms []*postmortems.Postmortem, category string) []
 	return out
 }
 
-// CompanySlug turns a company name into a URL-safe slug used by the
-// /company/{slug} route. It is exported so templates and tests can
-// consume the same algorithm.
+// CompanySlug turns a company name into a URL-safe slug for /company/{slug}.
 func CompanySlug(c string) string {
 	var b strings.Builder
 	prevDash := false
@@ -464,18 +413,14 @@ func getPostmortemsByCompanySlug(pms []*postmortems.Postmortem, slug string) []p
 	return out
 }
 
-// labeledCount is a (name, count) pair used to render top-N lists in
-// the templates (categories on a company page, companies on a category
-// page) without forcing the templates to know how to sort maps.
+// labeledCount is a (name, count) pair used by templates for top-N lists.
 type labeledCount struct {
 	Name  string
-	Slug  string // optional; populated for company entries
+	Slug  string // populated for company entries
 	Count int
 }
 
-// dateRange tracks the min/max event dates across a set of postmortems
-// so the company and category pages can show "incidents from X to Y"
-// headers.
+// dateRange tracks min/max event dates for company/category headers.
 type dateRange struct {
 	Earliest time.Time
 	Latest   time.Time
@@ -494,8 +439,7 @@ func (d dateRange) String() string {
 	return es + " \u2013 " + ls
 }
 
-// SpanYears returns the number of distinct calendar years covered by
-// the range, or 0 if no dates are known.
+// SpanYears returns the number of calendar years covered, or 0 if unknown.
 func (d dateRange) SpanYears() int {
 	if !d.HasAny {
 		return 0
@@ -527,9 +471,7 @@ func computeDateRange(pms []postmortems.Postmortem) dateRange {
 	return dr
 }
 
-// topLabeledCounts returns counts for unique values keyed by name,
-// sorted by count descending and then name ascending. Limit caps the
-// returned slice; pass 0 to return everything.
+// topLabeledCounts returns counts sorted by count desc, name asc; limit<=0 returns all.
 func topLabeledCounts(counts map[string]int, limit int) []labeledCount {
 	out := make([]labeledCount, 0, len(counts))
 	for k, v := range counts {
@@ -550,9 +492,7 @@ func topLabeledCounts(counts map[string]int, limit int) []labeledCount {
 	return out
 }
 
-// topCompanies returns up to limit company entries ordered by
-// postmortem count descending, with their canonical slug attached so
-// templates can link without re-deriving it.
+// topCompanies is topLabeledCounts with CompanySlug attached on each entry.
 func topCompanies(counts map[string]int, limit int) []labeledCount {
 	out := topLabeledCounts(counts, limit)
 	for i := range out {
@@ -561,9 +501,7 @@ func topCompanies(counts map[string]int, limit int) []labeledCount {
 	return out
 }
 
-// sortPostmortems orders postmortems by event date descending (most
-// recent first), with undated entries pushed to the bottom and
-// deterministically secondary-sorted by title/company.
+// sortPostmortems orders by event date desc, undated last, then title/company.
 func sortPostmortems(pms []postmortems.Postmortem) {
 	sort.SliceStable(pms, func(i, j int) bool {
 		ai, aj := pms[i].StartTime, pms[j].StartTime
@@ -590,8 +528,7 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
-// prettifyText turns slugs like "cascading-failure" into "Cascading
-// Failure" for headings. Already-capitalised input is preserved.
+// prettifyText turns "cascading-failure" into "Cascading Failure".
 func prettifyText(s string) string {
 	s = strings.ReplaceAll(s, "-", " ")
 	s = strings.ReplaceAll(s, "_", " ")
@@ -605,8 +542,7 @@ func prettifyText(s string) string {
 	return strings.Join(parts, " ")
 }
 
-// categoryDescriptions provides human-readable blurbs for the category
-// page header. Categories without an entry get a generic fallback.
+// categoryDescriptions are blurbs shown on the category page header.
 var categoryDescriptions = map[string]string{
 	"automation":        "Incidents caused or amplified by automated systems acting incorrectly, too aggressively, or without enough human review.",
 	"cascading-failure": "One small failure that snowballed: retries, thundering herds, or thread pool exhaustion that took out adjacent services.",
@@ -626,8 +562,7 @@ func describeCategory(c string) string {
 	return "Postmortems tagged with \"" + c + "\"."
 }
 
-// categoryEmoji returns a small visual cue per category so headers
-// have something to anchor the eye. Falls back to a generic icon.
+// categoryEmoji returns a per-category emoji for the page header.
 func categoryEmoji(c string) string {
 	switch c {
 	case "automation":
@@ -863,13 +798,8 @@ func postmortemPageHandler(dir string) http.HandlerFunc {
 			return
 		}
 
-		// Capture an OG-friendly description from the *un-rendered*
-		// Markdown body before blackfriday turns it into HTML --
-		// otherwise plainText would have to peel through paragraph
-		// wrappers etc. Prefer the curated Summary when set; some
-		// summaries also contain Markdown emphasis/links so we
-		// always strip syntax rather than relying on the curator
-		// having pre-cleaned them.
+		// Summarize from the un-rendered Markdown so we don't have to peel
+		// blackfriday's HTML wrappers back off.
 		metaSource := pm.Summary
 		if metaSource == "" {
 			metaSource = pm.Description
@@ -964,9 +894,7 @@ type sitemapURLSet struct {
 	URLs    []sitemapURL `xml:"url"`
 }
 
-// baseURL derives the scheme+host for absolute URLs in the sitemap from
-// the incoming request. It honours the X-Forwarded-Proto header so the
-// sitemap works correctly behind a TLS-terminating reverse proxy.
+// baseURL derives scheme+host from the request, honouring X-Forwarded-Proto.
 func baseURL(r *http.Request) string {
 	scheme := "http"
 	if r.TLS != nil {
@@ -978,8 +906,8 @@ func baseURL(r *http.Request) string {
 	return scheme + "://" + r.Host
 }
 
-// sitemapHandler generates a dynamic sitemap.xml covering all postmortems,
-// categories, companies and the static pages of the site.
+// sitemapHandler generates sitemap.xml for postmortems, categories, companies
+// and static pages.
 func sitemapHandler(dir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		l := logging.FromContext(r.Context())
@@ -997,8 +925,6 @@ func sitemapHandler(dir string) http.HandlerFunc {
 			{Loc: base + "/", ChangeFreq: "daily", Priority: "1.0"},
 			{Loc: base + "/about", ChangeFreq: "monthly", Priority: "0.5"},
 		}
-
-		// One entry per category.
 		for _, cat := range postmortems.Categories {
 			urls = append(urls, sitemapURL{
 				Loc:        base + "/category/" + cat,
@@ -1006,8 +932,6 @@ func sitemapHandler(dir string) http.HandlerFunc {
 				Priority:   "0.6",
 			})
 		}
-
-		// Collect unique companies.
 		seen := map[string]bool{}
 		for _, pm := range pms {
 			slug := CompanySlug(pm.Company)
@@ -1020,8 +944,6 @@ func sitemapHandler(dir string) http.HandlerFunc {
 				})
 			}
 		}
-
-		// One entry per postmortem.
 		for _, pm := range pms {
 			urls = append(urls, sitemapURL{
 				Loc:        base + "/postmortem/" + pm.UUID,
@@ -1035,9 +957,7 @@ func sitemapHandler(dir string) http.HandlerFunc {
 			URLs:  urls,
 		}
 
-		// Build the full response body in memory before writing any headers so
-		// that a serialisation error doesn't leave the client with a 200 status
-		// and a truncated body.
+		// Buffer so an encode error doesn't leave a half-written 200 response.
 		var buf strings.Builder
 		buf.WriteString(xml.Header)
 		enc := xml.NewEncoder(&buf)
