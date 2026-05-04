@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -30,9 +29,11 @@ var (
 	log            = logging.Must(logging.NewLogger(postmortems.Service))
 	action         = flag.String("action", "", "")
 	dir            = flag.String("dir", "./data/", "")
+	importSource   = flag.String("source", "", "import: URL or file path to read entries from (default: danluu/post-mortems README)")
+	importNoEnrich = flag.Bool("no-enrich", false, "import: skip the enrich step on newly added entries")
 	enrichApply    = flag.Bool("apply", false, "enrich: write changes back into the markdown files (default: dry run)")
 	enrichTimeout  = flag.Duration("http-timeout", 15*time.Second, "enrich: per-URL fetch timeout")
-	enrichOnly     = flag.String("only", "", "enrich: only process files whose name starts with this UUID prefix")
+	enrichOnly     = flag.String("only", "", "enrich: comma-separated list of UUID prefixes to process (default: all files)")
 	enrichForce    = flag.Bool("force", false, "enrich: overwrite non-empty fields (default: only fill blanks)")
 	enrichKeepDesc = flag.Bool("keep-description", false, "enrich: preserve existing markdown body, only refresh metadata")
 	enrichMaxAge   = flag.Duration("max-age", 720*time.Hour, "enrich: skip files whose source_fetched_at is newer than this")
@@ -40,7 +41,7 @@ var (
 	gcpProject     = flag.String("gcp-project", os.Getenv("GOOGLE_CLOUD_PROJECT"), "enrich: GCP project for Vertex AI (defaults to GOOGLE_CLOUD_PROJECT)")
 	gcpLocation    = flag.String("gcp-location", "us-central1", "enrich: Vertex AI location/region")
 	geminiModel    = flag.String("gemini-model", "gemini-2.5-flash", "enrich: Gemini model name")
-	qs               = []*survey.Question{
+	qs             = []*survey.Question{
 		{
 			Name:     "url",
 			Prompt:   &survey.Input{Message: "URL of Postmortem?"},
@@ -85,15 +86,15 @@ var (
 	}
 )
 
-const (
-	usageText = `pm [options...]
+const usageText = `pm [options...]
 Options:
 -action     The action we should take.
 -dir        The directory with Markdown files for to extract or parse. Defaults to ./data
 
 Actions:
-extract         Extract postmortems from the collection and create separate files.
-upstream-fetch  Download and extract postmortems from https://github.com/danluu/post-mortems.
+import          Additively pull entries from -source (default: danluu/post-mortems
+                README) and enrich any new ones via Gemini. Idempotent and safe to
+                run repeatedly. Pass -source=PATH, -no-enrich, or any enrich flag.
 generate        Generate JSON files from the postmortem Markdown files.
 new             Create a new postmortem file.
 validate        Validate the postmortem files in the directory.
@@ -104,9 +105,6 @@ enrich          Fetch each postmortem source URL (with Wayback fallback), extrac
                 Requires GOOGLE_APPLICATION_CREDENTIALS and a GCP project. Pass -apply to
                 write changes; -force to overwrite non-empty fields.
 `
-	danluuReadme = "https://raw.githubusercontent.com/danluu/post-mortems/master/README.md"
-	extractFile  = "./tmp/posts.md"
-)
 
 // Serve runs the HTTP server with otelhttp metrics exposed on /metrics.
 func Serve() error {
@@ -171,10 +169,8 @@ func main() {
 
 	var err error
 	switch *action {
-	case "extract":
-		err = postmortems.ExtractPostmortems(extractFile, *dir)
-	case "upstream-fetch":
-		err = postmortems.ExtractPostmortems(danluuReadme, *dir)
+	case "import":
+		err = runImport()
 	case "generate":
 		err = postmortems.GenerateJSON(*dir)
 	case "new":
@@ -194,9 +190,43 @@ func main() {
 	}
 }
 
-// runEnrich wires the CLI flags into the enrich pipeline. Kept out of
-// main() so the action's dependencies (Vertex AI client) aren't
-// constructed for unrelated actions.
+// runImport wires CLI flags into the import pipeline. The LLM is
+// constructed best-effort: when credentials are missing the import
+// still runs and the enrich step is skipped with a warning.
+func runImport() error {
+	ctx := context.Background()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	opts := importOptions{
+		Dir:      *dir,
+		Source:   *importSource,
+		NoEnrich: *importNoEnrich,
+		Logger:   logger,
+		Enrich: enrichOptions{
+			Force:           *enrichForce,
+			KeepDescription: *enrichKeepDesc,
+			MaxAge:          *enrichMaxAge,
+			HTTPTimeout:     *enrichTimeout,
+			Concurrency:     *enrichWorkers,
+			Logger:          logger,
+		},
+	}
+
+	if !*importNoEnrich {
+		llm, err := NewGeminiClient(ctx, *gcpProject, *gcpLocation, *geminiModel)
+		if err != nil {
+			logger.Warn("LLM unavailable, skipping enrich step", "err", err)
+		} else {
+			defer func() { _ = llm.Close() }()
+			opts.Enrich.LLM = llm
+		}
+	}
+
+	_, err := RunImport(ctx, opts)
+	return err
+}
+
+// runEnrich wires CLI flags into the enrich pipeline.
 func runEnrich() error {
 	ctx := context.Background()
 	llm, err := NewGeminiClient(ctx, *gcpProject, *gcpLocation, *geminiModel)
@@ -245,42 +275,19 @@ func newPostmortem(dir string) error {
 	return pm.Save(dir)
 }
 
-// keywordsTransformer turns a comma-separated string entered into a
-// survey.Input into a []string with whitespace trimmed and empty entries
-// dropped, so the result can be assigned directly into the Keywords
-// slice via survey.Ask.
-func keywordsTransformer(ans interface{}) interface{} {
+// keywordsTransformer turns the comma-separated string entered into a
+// survey.Input into a []string suitable for the Keywords field.
+func keywordsTransformer(ans any) any {
 	str, ok := ans.(string)
 	if !ok {
 		return ans
 	}
-	var out []string
-	for _, raw := range splitAndTrim(str, ",") {
-		if raw == "" {
-			continue
-		}
-		out = append(out, raw)
-	}
-	return out
-}
-
-// splitAndTrim splits s on sep and trims whitespace from each element.
-// Defined here rather than pulling in strings.Split + a loop in two
-// places to keep the keyword handling self-contained.
-func splitAndTrim(s, sep string) []string {
-	if s == "" {
-		return nil
-	}
-	parts := strings.Split(s, sep)
-	for i, p := range parts {
-		parts[i] = strings.TrimSpace(p)
-	}
-	return parts
+	return splitCSV(str)
 }
 
 // IsURL validates that a value parses as an absolute URL.
 func IsURL() survey.Validator {
-	return func(val interface{}) error {
+	return func(val any) error {
 		str, ok := val.(string)
 		if !ok {
 			return fmt.Errorf("could not decode string")

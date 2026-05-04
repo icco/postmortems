@@ -2,6 +2,7 @@ package main
 
 import (
 	"regexp"
+	"slices"
 	"sort"
 
 	"github.com/icco/postmortems"
@@ -133,18 +134,9 @@ func mergeCategories(existing, suggestions []string) []string {
 		}
 	}
 	for _, c := range existing {
-		if !contains(out, c) {
+		if !slices.Contains(out, c) {
 			out = append(out, c)
 		}
 	}
 	return out
-}
-
-func contains(s []string, v string) bool {
-	for _, x := range s {
-		if x == v {
-			return true
-		}
-	}
-	return false
 }

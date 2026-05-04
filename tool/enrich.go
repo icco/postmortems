@@ -1,12 +1,14 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -107,16 +109,6 @@ func titleFromPage(stored, page string) bool {
 	return isBadTitle(stored)
 }
 
-// appendUnique appends s to xs if it's not already present.
-func appendUnique(xs []string, s string) []string {
-	for _, x := range xs {
-		if x == s {
-			return xs
-		}
-	}
-	return append(xs, s)
-}
-
 // looksLikeJunkDescription reports whether s reads like an "LLM had no
 // useful source" disclaimer rather than an actual incident write-up.
 func looksLikeJunkDescription(s string) bool {
@@ -134,16 +126,56 @@ func looksLikeJunkDescription(s string) bool {
 
 // enrichOptions configures the enrich action.
 type enrichOptions struct {
-	Dir             string
-	Only            string // process only this UUID; empty means all
-	Apply           bool   // write changes back; false = report only
-	Force           bool   // overwrite non-empty fields
-	KeepDescription bool   // preserve existing Description body
+	Dir string
+	// Only is a comma-separated list of UUID prefixes; a file is
+	// processed when at least one prefix matches its name. Empty means
+	// "all files in Dir".
+	Only            string
+	Apply           bool // write changes back; false = report only
+	Force           bool // overwrite non-empty fields
+	KeepDescription bool // preserve existing Description body
 	MaxAge          time.Duration
 	HTTPTimeout     time.Duration
 	Concurrency     int
 	LLM             LLMClient    // injectable for tests
 	Logger          *slog.Logger // diagnostics; defaults to slog.Default()
+}
+
+// onlyMatches reports whether name matches one of the comma-separated
+// UUID prefixes in only. Empty (or all-empty) only matches everything.
+func onlyMatches(name, only string) bool {
+	prefixes := splitCSV(only)
+	if len(prefixes) == 0 {
+		return true
+	}
+	for _, p := range prefixes {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// addUnique appends s to xs if it isn't already there.
+func addUnique(xs []string, s string) []string {
+	if slices.Contains(xs, s) {
+		return xs
+	}
+	return append(xs, s)
+}
+
+// splitCSV splits s on commas, trims each part, and drops empties.
+func splitCSV(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // enrichResult records the outcome of processing one .md file.
@@ -195,7 +227,7 @@ func EnrichPostmortems(ctx context.Context, opts enrichOptions) ([]enrichResult,
 		if !strings.HasSuffix(name, ".md") {
 			continue
 		}
-		if opts.Only != "" && !strings.HasPrefix(name, opts.Only) {
+		if !onlyMatches(name, opts.Only) {
 			continue
 		}
 		paths = append(paths, filepath.Join(opts.Dir, name))
@@ -209,7 +241,7 @@ func EnrichPostmortems(ctx context.Context, opts enrichOptions) ([]enrichResult,
 	results := make(chan enrichResult)
 
 	var wg sync.WaitGroup
-	for i := 0; i < opts.Concurrency; i++ {
+	for range opts.Concurrency {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -269,7 +301,7 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	var preChanged []string
 
 	// Unwrap a Wayback snapshot stored in url: into url + archive_url.
-	if origin, snapshot, ok := ParseWaybackURL(pm.URL); ok {
+	if origin, snapshot, ok := postmortems.ParseWaybackURL(pm.URL); ok {
 		pm.URL = origin
 		preChanged = append(preChanged, "url")
 		if pm.ArchiveURL == "" {
@@ -288,11 +320,11 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		preChanged = append(preChanged, "description", "summary")
 		if pm.Title != "" {
 			pm.Title = ""
-			preChanged = appendUnique(preChanged, "title")
+			preChanged = addUnique(preChanged, "title")
 		}
 		if len(pm.Keywords) > 0 {
 			pm.Keywords = nil
-			preChanged = appendUnique(preChanged, "keywords")
+			preChanged = addUnique(preChanged, "keywords")
 		}
 	}
 
@@ -328,11 +360,8 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	// availability API but fall back to a curated archive_url already
 	// in the file, since the API sometimes claims no snapshot when one
 	// clearly exists.
-	archiveCandidate := fr.ArchiveURL
-	if archiveCandidate == "" {
-		archiveCandidate = pm.ArchiveURL
-	}
-	if _, ifSnap, ok := ParseWaybackURL(archiveCandidate); ok {
+	archiveCandidate := cmp.Or(fr.ArchiveURL, pm.ArchiveURL)
+	if _, ifSnap, ok := postmortems.ParseWaybackURL(archiveCandidate); ok {
 		archiveCandidate = ifSnap
 	}
 	if looksLikeJunkDescription(llmOut.ExpandedDescription) && !fr.UsedArchive && archiveCandidate != "" && archiveCandidate != pm.URL {
@@ -363,7 +392,7 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	if looksLikeJunkDescription(llmOut.ExpandedDescription) {
 		if pm.Title != "" && titleFromPage(pm.Title, page.Title) {
 			pm.Title = ""
-			preChanged = appendUnique(preChanged, "title")
+			preChanged = addUnique(preChanged, "title")
 		}
 		llmOut = EnrichOutput{Confidence: llmOut.Confidence, Notes: llmOut.Notes}
 		page = PageMetadata{}
@@ -371,9 +400,7 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 
 	changed := mergeEnrichment(pm, fr, page, llmOut, opts)
 	for _, c := range preChanged {
-		if !contains(changed, c) {
-			changed = append(changed, c)
-		}
+		changed = addUnique(changed, c)
 	}
 	res.Changed = changed
 	flushSave(pm, opts, &res, changed)
@@ -458,7 +485,7 @@ func mergeEnrichment(pm *postmortems.Postmortem, fr FetchResult, page PageMetada
 	pm.EndTime = setTime("end_time", pm.EndTime, llm.EndTime, opts.Force)
 
 	if len(llm.Keywords) > 0 {
-		merged, added := mergeKeywords(pm.Keywords, llm.Keywords, opts.Force)
+		merged, added := mergeKeywords(pm.Keywords, llm.Keywords)
 		if added {
 			pm.Keywords = merged
 			changed = append(changed, "keywords")
@@ -487,13 +514,13 @@ func mergeEnrichment(pm *postmortems.Postmortem, fr FetchResult, page PageMetada
 
 // mergeKeywords unions existing and additions case-insensitively,
 // preserving order. Returns merged and whether anything was added.
-func mergeKeywords(existing, additions []string, force bool) ([]string, bool) {
+func mergeKeywords(existing, additions []string) ([]string, bool) {
 	have := map[string]bool{}
 	for _, k := range existing {
 		have[strings.ToLower(k)] = true
 	}
 	added := false
-	out := append([]string{}, existing...)
+	out := slices.Clone(existing)
 	for _, k := range additions {
 		k = strings.TrimSpace(k)
 		if k == "" {
@@ -506,17 +533,7 @@ func mergeKeywords(existing, additions []string, force bool) ([]string, bool) {
 		out = append(out, k)
 		added = true
 	}
-	_ = force
 	return out, added
-}
-
-func firstNonEmpty(s ...string) string {
-	for _, v := range s {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
 }
 
 // nonBad returns s unless it matches a known-bad title pattern.
@@ -533,7 +550,7 @@ func nonBad(s string) string {
 // the (possibly extended) changed list.
 func applyTitle(existing, llmTitle, pageTitle string, force bool, changed []string) (string, []string) {
 	existingBad := isBadTitle(existing)
-	next := firstNonEmpty(nonBad(llmTitle), nonBad(pageTitle))
+	next := cmp.Or(nonBad(llmTitle), nonBad(pageTitle))
 	switch {
 	case existingBad && next != "":
 		if existing != next {

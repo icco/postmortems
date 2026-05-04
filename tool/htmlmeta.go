@@ -121,18 +121,18 @@ func absorbJSONLD(n *html.Node, publishedAt *time.Time) {
 	if raw == "" {
 		return
 	}
-	var any interface{}
-	if err := json.Unmarshal([]byte(raw), &any); err != nil {
+	var v any
+	if err := json.Unmarshal([]byte(raw), &v); err != nil {
 		return
 	}
-	walkJSONLD(any, publishedAt)
+	walkJSONLD(v, publishedAt)
 }
 
 // walkJSONLD recurses through JSON-LD (object, list, or @graph) and
 // fills publishedAt on first hit.
-func walkJSONLD(v interface{}, publishedAt *time.Time) {
+func walkJSONLD(v any, publishedAt *time.Time) {
 	switch x := v.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		if publishedAt.IsZero() {
 			if s, ok := x["datePublished"].(string); ok {
 				if t, ok := tryParseTime(s); ok {
@@ -143,7 +143,7 @@ func walkJSONLD(v interface{}, publishedAt *time.Time) {
 		if g, ok := x["@graph"]; ok {
 			walkJSONLD(g, publishedAt)
 		}
-	case []interface{}:
+	case []any:
 		for _, item := range x {
 			walkJSONLD(item, publishedAt)
 		}

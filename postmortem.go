@@ -92,7 +92,7 @@ var (
 // returns the parsed time.Time. The zero time is returned for missing
 // or empty values; this matches the existing on-disk convention of
 // `start_time: ""` meaning "unknown".
-func parseFrontmatterTime(v interface{}) (time.Time, error) {
+func parseFrontmatterTime(v any) (time.Time, error) {
 	switch x := v.(type) {
 	case nil:
 		return time.Time{}, nil
@@ -178,7 +178,7 @@ func Parse(f io.Reader) (*Postmortem, error) {
 		p.Summary = summary
 	}
 
-	if cats, ok := fm["categories"].([]interface{}); ok {
+	if cats, ok := fm["categories"].([]any); ok {
 		for _, c := range cats {
 			if cat, ok := c.(string); ok {
 				p.Categories = append(p.Categories, cat)
@@ -186,7 +186,7 @@ func Parse(f io.Reader) (*Postmortem, error) {
 		}
 	}
 
-	if kws, ok := fm["keywords"].([]interface{}); ok {
+	if kws, ok := fm["keywords"].([]any); ok {
 		for _, k := range kws {
 			if kw, ok := k.(string); ok {
 				p.Keywords = append(p.Keywords, kw)

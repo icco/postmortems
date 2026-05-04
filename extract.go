@@ -23,11 +23,33 @@ var (
 `
 )
 
-// ExtractPostmortems extracts each postmortem entry from loc into its own file under dir.
-func ExtractPostmortems(loc string, dir string) error {
+// ImportReport summarises one ExtractPostmortems run.
+type ImportReport struct {
+	Source          string        // URL or file path that was read
+	Added           []*Postmortem // entries newly written to disk
+	SkippedExisting int           // upstream entries already in dir
+	SkippedInvalid  int           // malformed/rejected upstream lines
+}
+
+// ExtractPostmortems writes each postmortem entry from loc into its own
+// file under dir. The import is additive: entries whose canonical URL
+// already exists in dir are skipped, so previously enriched fields are
+// preserved. The returned report lists freshly-saved entries so callers
+// can chain follow-up work without rescanning the directory.
+func ExtractPostmortems(loc string, dir string) (*ImportReport, error) {
 	posts, err := ValidateDir(dir)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	have := make(map[string]bool, len(posts)*2)
+	for _, p := range posts {
+		if p.URL != "" {
+			have[CanonicalURL(p.URL)] = true
+		}
+		if p.ArchiveURL != "" {
+			have[CanonicalURL(p.ArchiveURL)] = true
+		}
 	}
 
 	var data []byte
@@ -35,7 +57,7 @@ func ExtractPostmortems(loc string, dir string) error {
 		// #nosec G107
 		resp, err := http.Get(loc)
 		if err != nil {
-			return fmt.Errorf("could not get %q: %w", loc, err)
+			return nil, fmt.Errorf("could not get %q: %w", loc, err)
 		}
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
@@ -45,52 +67,80 @@ func ExtractPostmortems(loc string, dir string) error {
 
 		data, err = io.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("could not read response body: %w", err)
+			return nil, fmt.Errorf("could not read response body: %w", err)
 		}
 	} else if isFile(loc) {
 		data, err = os.ReadFile(loc) // #nosec G304
 		if err != nil {
-			return fmt.Errorf("error opening file %q: %w", loc, err)
+			return nil, fmt.Errorf("error opening file %q: %w", loc, err)
 		}
 	} else {
-		return fmt.Errorf("%q is not a file or a url", loc)
+		return nil, fmt.Errorf("%q is not a file or a url", loc)
 	}
 
+	report := &ImportReport{Source: loc}
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
-		id := guuid.New()
-		pm := &Postmortem{UUID: id.String()}
-
-		if re.Match(scanner.Bytes()) {
-			matches := re.FindStringSubmatch(scanner.Text())
-			pm.UUID = id.String()
-			pm.URL = matches[2]
-			pm.Company = matches[1]
-			pm.Description = matches[3]
-			pm.Categories = []string{categoryPostmortem}
+		matches := re.FindStringSubmatch(scanner.Text())
+		if matches == nil {
+			continue
+		}
+		company := matches[1]
+		rawURL := matches[2]
+		desc := matches[3]
+		if !looksLikeSingleURL(rawURL) {
+			report.SkippedInvalid++
+			log.Warnw("skipping malformed entry", "url", rawURL, "company", company)
+			continue
 		}
 
-		// See if there is an existing one.
-		for _, existing := range posts {
-			if existing.URL == pm.URL {
-				pm.UUID = existing.UUID
-				pm.Categories = existing.Categories
-				pm.Product = existing.Product
-			}
+		canon := CanonicalURL(rawURL)
+		if have[canon] {
+			report.SkippedExisting++
+			continue
 		}
 
-		if pm.URL != "" && pm.Company != "" && pm.Description != "" {
-			if err := pm.Save(dir); err != nil {
-				return fmt.Errorf("error saving postmortem file: %w", err)
-			}
+		// Pre-unwrap Wayback snapshots so the file shape matches the
+		// post-enrich representation and re-imports stay idempotent.
+		entryURL := rawURL
+		var archiveURL string
+		if origin, snapshot, ok := ParseWaybackURL(rawURL); ok {
+			entryURL = origin
+			archiveURL = snapshot
 		}
+
+		pm := &Postmortem{
+			UUID:        guuid.New().String(),
+			URL:         entryURL,
+			ArchiveURL:  archiveURL,
+			Company:     company,
+			Description: desc,
+			Categories:  []string{categoryPostmortem},
+		}
+		if pm.Company == "" || pm.Description == "" {
+			report.SkippedInvalid++
+			continue
+		}
+
+		if err := pm.Save(dir); err != nil {
+			return nil, fmt.Errorf("error saving postmortem file: %w", err)
+		}
+		have[canon] = true
+		report.Added = append(report.Added, pm)
 	}
 
 	if err := scanner.Err(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	log.Infow("extracted postmortems",
+		"source", loc,
+		"added", len(report.Added),
+		"skipped_existing", report.SkippedExisting,
+		"skipped_invalid", report.SkippedInvalid,
+	)
+
+	return report, nil
 }
 
 func isURL(tgt string) bool {
