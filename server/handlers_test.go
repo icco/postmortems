@@ -136,6 +136,7 @@ const (
 	testCompany     = "CCP Games"
 	testCategory    = "postmortem"
 	testDescription = "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)"
+	amazonCompany   = "Amazon"
 )
 
 func TestLoadPostmortem(t *testing.T) {
@@ -234,7 +235,7 @@ func TestCompanySlug(t *testing.T) {
 	}{
 		{"CCP Games", "ccp-games"},
 		{"Healthcare.gov", "healthcare-gov"},
-		{"Amazon", "amazon"},
+		{amazonCompany, "amazon"},
 		{"  weird   spaces  ", "weird-spaces"},
 		{"a/b/c", "a-b-c"},
 		{"", ""},
@@ -326,7 +327,7 @@ func TestGetPosmortemByCategory(t *testing.T) {
 				&postmortems.Postmortem{
 					UUID:        "0ea35968-4578-408c-b4fd-8c6ccc3501b0",
 					URL:         "http://aws.amazon.com/message/4372T8/",
-					Company:     "Amazon",
+					Company:     amazonCompany,
 					Categories:  []string{"hardware"},
 					Description: "At 10:25pm PDT on June 4, loss of power at an AWS Sydney facility resulting from severe weather in that area lead to disruption to a significant number of instances in an Availability Zone. Due to the signature of the power loss, power  isolation breakers did not engage, resulting in backup energy reserves draining into the degraded power grid.",
 				},
@@ -355,7 +356,7 @@ func TestGetPosmortemByCategory(t *testing.T) {
 				&postmortems.Postmortem{
 					UUID:        "0ea35968-4578-408c-b4fd-8c6ccc3501b0",
 					URL:         "http://aws.amazon.com/message/4372T8/",
-					Company:     "Amazon",
+					Company:     amazonCompany,
 					Categories:  []string{"hardware"},
 					Description: "At 10:25pm PDT on June 4, loss of power at an AWS Sydney facility resulting from severe weather in that area lead to disruption to a significant number of instances in an Availability Zone. Due to the signature of the power loss, power  isolation breakers did not engage, resulting in backup energy reserves draining into the degraded power grid.",
 				},
