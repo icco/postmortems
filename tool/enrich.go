@@ -321,9 +321,19 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	}
 
 	// Origin is dead-but-200 (status page, captcha, parking, rebrand):
-	// retry once via the Wayback snapshot.
-	if looksLikeJunkDescription(llmOut.ExpandedDescription) && !fr.UsedArchive && fr.ArchiveURL != "" && fr.ArchiveURL != pm.URL {
-		archiveHTML, _, archiveErr := fetcher.GetRaw(ctx, fr.ArchiveURL)
+	// retry once via the Wayback snapshot. We prefer the URL from the
+	// availability API but fall back to a curated archive_url already
+	// in the file, since the API sometimes claims no snapshot when one
+	// clearly exists.
+	archiveCandidate := fr.ArchiveURL
+	if archiveCandidate == "" {
+		archiveCandidate = pm.ArchiveURL
+	}
+	if _, ifSnap, ok := ParseWaybackURL(archiveCandidate); ok {
+		archiveCandidate = ifSnap
+	}
+	if looksLikeJunkDescription(llmOut.ExpandedDescription) && !fr.UsedArchive && archiveCandidate != "" && archiveCandidate != pm.URL {
+		archiveHTML, _, archiveErr := fetcher.GetRaw(ctx, archiveCandidate)
 		if archiveErr == nil && strings.TrimSpace(archiveHTML) != "" {
 			page2 := ExtractMetadata(archiveHTML)
 			if strings.TrimSpace(page2.PlainText) != "" {
