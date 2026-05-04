@@ -33,22 +33,24 @@ type Options struct {
 // postmortemView is a render-layer copy of Postmortem whose Description
 // is template.HTML so html/template emits pre-rendered Markdown verbatim.
 type postmortemView struct {
-	UUID        string
-	URL         string
-	Company     string
-	Product     string
-	Categories  []string
-	Description template.HTML // already sanitised by blackfriday
+	UUID            string
+	URL             string
+	Company         string
+	Product         string
+	Categories      []string
+	EventDatePeriod string
+	Description     template.HTML // already sanitised by blackfriday
 }
 
 func toView(pm *postmortems.Postmortem) postmortemView {
 	return postmortemView{
-		UUID:        pm.UUID,
-		URL:         pm.URL,
-		Company:     pm.Company,
-		Product:     pm.Product,
-		Categories:  pm.Categories,
-		Description: template.HTML(pm.Description), // #nosec G203 -- blackfriday output
+		UUID:            pm.UUID,
+		URL:             pm.URL,
+		Company:         pm.Company,
+		Product:         pm.Product,
+		Categories:      pm.Categories,
+		EventDatePeriod: pm.EventDatePeriod(),
+		Description:     template.HTML(pm.Description), // #nosec G203 -- blackfriday output
 	}
 }
 

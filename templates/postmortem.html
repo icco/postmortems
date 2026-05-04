@@ -4,6 +4,9 @@
 <article class="pa3 pa5-ns mw8 center">
   {{ range .Postmortems }}
   <h1 class="f3 f2-m f1-l">{{ .Company }}</h1>
+  {{ if .EventDatePeriod }}
+  <p class="lh-copy mt0"><strong>Event date:</strong> {{ .EventDatePeriod }}</p>
+  {{ end }}
   <ul>
     {{ range .Categories }}
     <li><a href="/category/{{ . }}">{{ . }}</a></li>
