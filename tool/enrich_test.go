@@ -138,6 +138,30 @@ func TestEnrich_FillsBlanksAndPreservesSummary(t *testing.T) {
 	}
 }
 
+// TestOnlyMatches checks the comma-separated UUID-prefix filter so we
+// can target a known set of new files (e.g. just-imported entries)
+// without re-enriching the rest of the corpus.
+func TestOnlyMatches(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, only string
+		want       bool
+	}{
+		{name: "abc.md", only: "", want: true},
+		{name: "abc.md", only: "abc", want: true},
+		{name: "abc.md", only: "xyz", want: false},
+		{name: "abc.md", only: "xyz,abc", want: true},
+		{name: "abc.md", only: " xyz , abc ", want: true},
+		{name: "abc.md", only: ",,,", want: true},
+		{name: "abc.md", only: "ab", want: true},
+	}
+	for _, tc := range cases {
+		if got := onlyMatches(tc.name, tc.only); got != tc.want {
+			t.Errorf("onlyMatches(%q,%q) = %v, want %v", tc.name, tc.only, got, tc.want)
+		}
+	}
+}
+
 func TestEnrich_DryRunDoesNotWrite(t *testing.T) {
 	t.Parallel()
 

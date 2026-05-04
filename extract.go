@@ -23,11 +23,25 @@ var (
 `
 )
 
-// ExtractPostmortems extracts each postmortem entry from loc into its own file under dir.
+// ExtractPostmortems imports each postmortem entry from loc into its
+// own file under dir. The import is additive: an entry whose URL
+// canonicalises to one already present in dir is skipped, so previously
+// enriched fields (title, dates, archive URL, summary, expanded body
+// etc.) are preserved across re-imports.
 func ExtractPostmortems(loc string, dir string) error {
 	posts, err := ValidateDir(dir)
 	if err != nil {
 		return err
+	}
+
+	have := make(map[string]bool, len(posts)*2)
+	for _, p := range posts {
+		if p.URL != "" {
+			have[CanonicalURL(p.URL)] = true
+		}
+		if p.ArchiveURL != "" {
+			have[CanonicalURL(p.ArchiveURL)] = true
+		}
 	}
 
 	var data []byte
@@ -56,39 +70,57 @@ func ExtractPostmortems(loc string, dir string) error {
 		return fmt.Errorf("%q is not a file or a url", loc)
 	}
 
+	var added, skipped, invalid int
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
-		id := guuid.New()
-		pm := &Postmortem{UUID: id.String()}
-
-		if re.Match(scanner.Bytes()) {
-			matches := re.FindStringSubmatch(scanner.Text())
-			pm.UUID = id.String()
-			pm.URL = matches[2]
-			pm.Company = matches[1]
-			pm.Description = matches[3]
-			pm.Categories = []string{categoryPostmortem}
+		matches := re.FindStringSubmatch(scanner.Text())
+		if matches == nil {
+			continue
+		}
+		company := matches[1]
+		rawURL := matches[2]
+		desc := matches[3]
+		if !looksLikeSingleURL(rawURL) {
+			invalid++
+			log.Warnw("skipping malformed entry", "url", rawURL, "company", company)
+			continue
 		}
 
-		// See if there is an existing one.
-		for _, existing := range posts {
-			if existing.URL == pm.URL {
-				pm.UUID = existing.UUID
-				pm.Categories = existing.Categories
-				pm.Product = existing.Product
-			}
+		canon := CanonicalURL(rawURL)
+		if have[canon] {
+			skipped++
+			continue
 		}
 
-		if pm.URL != "" && pm.Company != "" && pm.Description != "" {
-			if err := pm.Save(dir); err != nil {
-				return fmt.Errorf("error saving postmortem file: %w", err)
-			}
+		pm := &Postmortem{
+			UUID:        guuid.New().String(),
+			URL:         rawURL,
+			Company:     company,
+			Description: desc,
+			Categories:  []string{categoryPostmortem},
 		}
+		if pm.Company == "" || pm.Description == "" {
+			invalid++
+			continue
+		}
+
+		if err := pm.Save(dir); err != nil {
+			return fmt.Errorf("error saving postmortem file: %w", err)
+		}
+		have[canon] = true
+		added++
 	}
 
 	if err := scanner.Err(); err != nil {
 		return err
 	}
+
+	log.Infow("extracted postmortems",
+		"source", loc,
+		"added", added,
+		"skipped_existing", skipped,
+		"skipped_invalid", invalid,
+	)
 
 	return nil
 }

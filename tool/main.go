@@ -32,7 +32,7 @@ var (
 	dir            = flag.String("dir", "./data/", "")
 	enrichApply    = flag.Bool("apply", false, "enrich: write changes back into the markdown files (default: dry run)")
 	enrichTimeout  = flag.Duration("http-timeout", 15*time.Second, "enrich: per-URL fetch timeout")
-	enrichOnly     = flag.String("only", "", "enrich: only process files whose name starts with this UUID prefix")
+	enrichOnly     = flag.String("only", "", "enrich: comma-separated list of UUID prefixes to process (default: all files)")
 	enrichForce    = flag.Bool("force", false, "enrich: overwrite non-empty fields (default: only fill blanks)")
 	enrichKeepDesc = flag.Bool("keep-description", false, "enrich: preserve existing markdown body, only refresh metadata")
 	enrichMaxAge   = flag.Duration("max-age", 720*time.Hour, "enrich: skip files whose source_fetched_at is newer than this")
@@ -92,8 +92,10 @@ Options:
 -dir        The directory with Markdown files for to extract or parse. Defaults to ./data
 
 Actions:
-extract         Extract postmortems from the collection and create separate files.
-upstream-fetch  Download and extract postmortems from https://github.com/danluu/post-mortems.
+extract         Import new postmortems from a local collection file (./tmp/posts.md).
+                Existing entries (matched by canonical URL, including Wayback
+                unwrap) are skipped so enriched fields aren't overwritten.
+upstream-fetch  Same as extract but pulls from https://github.com/danluu/post-mortems.
 generate        Generate JSON files from the postmortem Markdown files.
 new             Create a new postmortem file.
 validate        Validate the postmortem files in the directory.

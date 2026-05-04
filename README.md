@@ -18,8 +18,12 @@ Options:
 -dir        The directory with Markdown files for to extract or parse. Defaults to ./data
 
 Actions:
-extract         Extract postmortems from the collection and create separate files.
-upstream-fetch  Download and extract postmortems from danluu/post-mortems.
+extract         Import new postmortems from a local collection file. Existing
+                entries (matched by canonical URL, including Wayback unwrap)
+                are left untouched.
+upstream-fetch  Same as extract but downloads the latest danluu/post-mortems
+                README. Use this to backfill missing entries; run `enrich`
+                afterwards to fill in metadata.
 generate        Generate JSON files from the postmortem Markdown files.
 new             Create a new postmortem file.
 validate        Validate the postmortem files in the directory.
@@ -47,6 +51,7 @@ go run ./tool -action=enrich                    # dry run
 go run ./tool -action=enrich -apply             # write changes
 go run ./tool -action=enrich -apply -force      # overwrite non-empty fields
 go run ./tool -action=enrich -apply -only=01494547
+go run ./tool -action=enrich -apply -only=01494547,019eb098    # multiple UUID prefixes
 ```
 
 Other flags: `-keep-description`, `-max-age=720h`, `-gcp-location`,

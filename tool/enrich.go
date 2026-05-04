@@ -134,16 +134,50 @@ func looksLikeJunkDescription(s string) bool {
 
 // enrichOptions configures the enrich action.
 type enrichOptions struct {
-	Dir             string
-	Only            string // process only this UUID; empty means all
-	Apply           bool   // write changes back; false = report only
-	Force           bool   // overwrite non-empty fields
-	KeepDescription bool   // preserve existing Description body
+	Dir string
+	// Only is a comma-separated list of UUID prefixes; a file is
+	// processed when at least one prefix matches its name. Empty means
+	// "all files in Dir".
+	Only            string
+	Apply           bool // write changes back; false = report only
+	Force           bool // overwrite non-empty fields
+	KeepDescription bool // preserve existing Description body
 	MaxAge          time.Duration
 	HTTPTimeout     time.Duration
 	Concurrency     int
 	LLM             LLMClient    // injectable for tests
 	Logger          *slog.Logger // diagnostics; defaults to slog.Default()
+}
+
+// onlyMatches reports whether name (a markdown filename) matches one of
+// the comma-separated UUID prefixes in only. An empty (or all-empty,
+// e.g. ",,,") only matches every file.
+func onlyMatches(name, only string) bool {
+	prefixes := splitNonEmpty(only, ",")
+	if len(prefixes) == 0 {
+		return true
+	}
+	for _, p := range prefixes {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// splitNonEmpty splits s on sep, trims each part, and drops empties.
+func splitNonEmpty(s, sep string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, sep) {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // enrichResult records the outcome of processing one .md file.
@@ -195,7 +229,7 @@ func EnrichPostmortems(ctx context.Context, opts enrichOptions) ([]enrichResult,
 		if !strings.HasSuffix(name, ".md") {
 			continue
 		}
-		if opts.Only != "" && !strings.HasPrefix(name, opts.Only) {
+		if !onlyMatches(name, opts.Only) {
 			continue
 		}
 		paths = append(paths, filepath.Join(opts.Dir, name))
