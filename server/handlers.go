@@ -38,6 +38,7 @@ type postmortemView struct {
 	Company     string
 	Product     string
 	Categories  []string
+	Keywords    []string
 	Description template.HTML // already sanitised by blackfriday
 }
 
@@ -48,6 +49,7 @@ func toView(pm *postmortems.Postmortem) postmortemView {
 		Company:     pm.Company,
 		Product:     pm.Product,
 		Categories:  pm.Categories,
+		Keywords:    pm.Keywords,
 		Description: template.HTML(pm.Description), // #nosec G203 -- blackfriday output
 	}
 }

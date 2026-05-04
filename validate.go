@@ -60,6 +60,12 @@ func ValidateFile(filename string) (*Postmortem, error) {
 		}
 	}
 
+	for _, kw := range p.Keywords {
+		if kw == "" {
+			return nil, fmt.Errorf("%s: keyword is empty", filename)
+		}
+	}
+
 	if p.Description == "" {
 		return nil, fmt.Errorf("%s: description is empty", filename)
 	}

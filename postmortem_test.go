@@ -3,6 +3,7 @@ package postmortems
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -49,5 +50,34 @@ func TestParse(t *testing.T) {
 				t.Errorf("Parse() returned unexpected results (-got +want):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestParseKeywords(t *testing.T) {
+	t.Parallel()
+
+	const body = `---
+uuid: "abc"
+url: "https://example.com/postmortem"
+company: "Example Inc"
+categories:
+- postmortem
+keywords:
+- dns
+- eu-west-1
+- "bgp leak"
+
+---
+
+Example body.
+`
+
+	got, err := Parse(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	want := []string{"dns", "eu-west-1", "bgp leak"}
+	if diff := cmp.Diff(got.Keywords, want); diff != "" {
+		t.Errorf("Keywords mismatch (-got +want):\n%s", diff)
 	}
 }

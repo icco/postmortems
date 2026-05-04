@@ -13,6 +13,12 @@
   <p class="lh-copy">
     {{ .Description }}
   </p>
+  {{ if .Keywords }}
+  <p class="lh-copy">
+    <strong>Keywords:</strong>
+    {{ range $i, $k := .Keywords }}{{ if $i }}, {{ end }}<span class="keyword">{{ $k }}</span>{{ end }}
+  </p>
+  {{ end }}
   <small>
     <a href="{{ .URL }}" target="_blank">Source</a> |
     <a href="https://github.com/icco/postmortems/blob/master/data/{{ .UUID }}.md" target="_blank">Edit Metadata</a> |

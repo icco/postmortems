@@ -354,3 +354,13 @@ ul {
         font-size: 2rem;
     }
 }
+
+.keyword {
+    display: inline-block;
+    background-color: #f0f0f0;
+    color: #333;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: .8rem;
+    margin: 0 2px;
+}
