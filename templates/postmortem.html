@@ -7,6 +7,9 @@
   {{ if .Title }}
   <h2 class="f5 f4-l fw4 mt0">{{ .Company }}</h2>
   {{ end }}
+  {{ if .EventDatePeriod }}
+  <p class="lh-copy mt0"><strong>Event date:</strong> {{ .EventDatePeriod }}</p>
+  {{ end }}
   <ul>
     {{ range .Categories }}
     <li><a href="/category/{{ . }}">{{ . }}</a></li>

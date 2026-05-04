@@ -8,6 +8,7 @@
         <tr>
           <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">Title</th>
           <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">Company</th>
+          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">Date</th>
           <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">Category</th>
         </tr>
       </thead>
@@ -18,6 +19,7 @@
             <a href="/postmortem/{{ .UUID }}">{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }}{{ end }}</a>
           </td>
           <td class="pv3 pr3 bb b--black-20">{{ .Company }}</td>
+          <td class="pv3 pr3 bb b--black-20">{{ .EventDatePeriod }}</td>
           <td class="pv3 pr3 bb b--black-20">
             {{ range .Categories }}
             <a href="/category/{{ . }}">{{ . }}</a>
