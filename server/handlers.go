@@ -136,14 +136,14 @@ func routeTag(next http.Handler) http.Handler {
 	})
 }
 
-func reportEndpoint() string    { return reportdHost + "/report/" + reportdService }
-func reportingEndpoint() string { return reportdHost + "/reporting/" + reportdService }
+func reportEndpoint() string    { return fmt.Sprintf("%s/report/%s", reportdHost, reportdService) }
+func reportingEndpoint() string { return fmt.Sprintf("%s/reporting/%s", reportdHost, reportdService) }
 
 // reportingHeaders sets Report-To and Reporting-Endpoints so browser
 // reports land in reportd. CSP itself is set by unrolled/secure.
 func reportingHeaders(next http.Handler) http.Handler {
-	reportTo := `{"group":"default","max_age":10886400,"endpoints":[{"url":"` + reportEndpoint() + `"}]}`
-	reportingEndpoints := `default="` + reportingEndpoint() + `"`
+	reportTo := fmt.Sprintf(`{"group":"default","max_age":10886400,"endpoints":[{"url":%q}]}`, reportEndpoint())
+	reportingEndpoints := fmt.Sprintf(`default=%q`, reportingEndpoint())
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -163,11 +163,11 @@ func secureOptions() secure.Options {
 		"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 		"img-src 'self' data:",
 		"font-src 'self' data: https://cdn.jsdelivr.net",
-		"connect-src 'self' " + reportdHost + " https://cdn.jsdelivr.net",
+		fmt.Sprintf("connect-src 'self' %s https://cdn.jsdelivr.net", reportdHost),
 		"object-src 'none'",
 		"base-uri 'self'",
 		"frame-ancestors 'none'",
-		"report-uri " + reportEndpoint(),
+		fmt.Sprintf("report-uri %s", reportEndpoint()),
 		"report-to default",
 	}, "; ")
 
