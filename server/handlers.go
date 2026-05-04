@@ -45,10 +45,9 @@ type PageMeta struct {
 const serverName = "postmortems"
 
 // reportd receives Web Vitals + browser security reports. See https://reportd.natwelch.com.
-const (
-	reportdHost    = "https://reportd.natwelch.com"
-	reportdService = "postmortems"
-)
+var reportd = url.URL{Scheme: "https", Host: "reportd.natwelch.com"}
+
+const reportdService = "postmortems"
 
 // Options configures the HTTP router. MetricsHandler is mounted at /metrics.
 type Options struct {
@@ -136,8 +135,8 @@ func routeTag(next http.Handler) http.Handler {
 	})
 }
 
-func reportEndpoint() string    { return fmt.Sprintf("%s/report/%s", reportdHost, reportdService) }
-func reportingEndpoint() string { return fmt.Sprintf("%s/reporting/%s", reportdHost, reportdService) }
+func reportEndpoint() string    { return reportd.JoinPath("report", reportdService).String() }
+func reportingEndpoint() string { return reportd.JoinPath("reporting", reportdService).String() }
 
 // reportingHeaders sets Report-To and Reporting-Endpoints so browser
 // reports land in reportd. CSP itself is set by unrolled/secure.
@@ -163,7 +162,7 @@ func secureOptions() secure.Options {
 		"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 		"img-src 'self' data:",
 		"font-src 'self' data: https://cdn.jsdelivr.net",
-		fmt.Sprintf("connect-src 'self' %s https://cdn.jsdelivr.net", reportdHost),
+		fmt.Sprintf("connect-src 'self' %s https://cdn.jsdelivr.net", reportd.String()),
 		"object-src 'none'",
 		"base-uri 'self'",
 		"frame-ancestors 'none'",
@@ -895,7 +894,7 @@ type sitemapURLSet struct {
 }
 
 // baseURL derives scheme+host from the request, honouring X-Forwarded-Proto.
-func baseURL(r *http.Request) string {
+func baseURL(r *http.Request) url.URL {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
@@ -903,7 +902,7 @@ func baseURL(r *http.Request) string {
 	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
 		scheme = proto
 	}
-	return scheme + "://" + r.Host
+	return url.URL{Scheme: scheme, Host: r.Host}
 }
 
 // sitemapHandler generates sitemap.xml for postmortems, categories, companies
@@ -920,14 +919,15 @@ func sitemapHandler(dir string) http.HandlerFunc {
 		}
 
 		base := baseURL(r)
+		at := func(p ...string) string { return base.JoinPath(p...).String() }
 
 		urls := []sitemapURL{
-			{Loc: base + "/", ChangeFreq: "daily", Priority: "1.0"},
-			{Loc: base + "/about", ChangeFreq: "monthly", Priority: "0.5"},
+			{Loc: at("/"), ChangeFreq: "daily", Priority: "1.0"},
+			{Loc: at("about"), ChangeFreq: "monthly", Priority: "0.5"},
 		}
 		for _, cat := range postmortems.Categories {
 			urls = append(urls, sitemapURL{
-				Loc:        base + "/category/" + cat,
+				Loc:        at("category", cat),
 				ChangeFreq: "weekly",
 				Priority:   "0.6",
 			})
@@ -938,7 +938,7 @@ func sitemapHandler(dir string) http.HandlerFunc {
 			if slug != "" && !seen[slug] {
 				seen[slug] = true
 				urls = append(urls, sitemapURL{
-					Loc:        base + "/company/" + slug,
+					Loc:        at("company", slug),
 					ChangeFreq: "weekly",
 					Priority:   "0.6",
 				})
@@ -946,7 +946,7 @@ func sitemapHandler(dir string) http.HandlerFunc {
 		}
 		for _, pm := range pms {
 			urls = append(urls, sitemapURL{
-				Loc:        base + "/postmortem/" + pm.UUID,
+				Loc:        at("postmortem", pm.UUID),
 				ChangeFreq: "monthly",
 				Priority:   "0.8",
 			})
