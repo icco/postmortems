@@ -115,7 +115,6 @@ func ExtractPostmortems(loc string, dir string) (*ImportReport, error) {
 			ArchiveURL:  archiveURL,
 			Company:     company,
 			Description: desc,
-			Categories:  []string{categoryPostmortem},
 		}
 		if pm.Company == "" || pm.Description == "" {
 			report.SkippedInvalid++

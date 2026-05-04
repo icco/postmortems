@@ -6,7 +6,6 @@ title: Linux kernel leap second deadlock crash on New Year's 2008-2009
 start_time: 2009-01-01T00:00:00Z
 categories:
 - cloud
-- postmortem
 - time
 keywords:
 - linux

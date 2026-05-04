@@ -132,7 +132,6 @@ const (
 	testUUID        = "01494547-7ee9-4169-a0c0-d921fa309d83"
 	testURL         = "http://community.eveonline.com/news/dev-blogs/about-the-boot.ini-issue/"
 	testCompany     = "CCP Games"
-	testCategory    = "postmortem"
 	testDescription = "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)"
 )
 
@@ -150,7 +149,6 @@ func TestLoadPostmortem(t *testing.T) {
 				UUID:        testUUID,
 				URL:         testURL,
 				Company:     testCompany,
-				Categories:  []string{testCategory},
 				Description: testDescription,
 			},
 			wantErr: false,
@@ -195,7 +193,6 @@ func TestLoadPostmortems(t *testing.T) {
 					UUID:        testUUID,
 					URL:         testURL,
 					Company:     testCompany,
-					Categories:  []string{testCategory},
 					Description: testDescription},
 			},
 			wantErr: false,
@@ -270,7 +267,7 @@ func TestPageMetaTags(t *testing.T) {
 		})
 	})
 
-	t.Run("postmortem", func(t *testing.T) {
+	t.Run("postmortem-page", func(t *testing.T) {
 		path := "/postmortem/" + testUUID
 		status, body := get(path)
 		if status != http.StatusOK {
@@ -363,14 +360,14 @@ func TestGetPostmortemsByCategory(t *testing.T) {
 		want     []postmortems.Postmortem
 	}{
 		{
-			name:     "successfully loading postmortems",
-			category: "postmortem",
+			name:     "filters by category",
+			category: "cloud",
 			pms: []*postmortems.Postmortem{
 				&postmortems.Postmortem{
 					UUID:        testUUID,
 					URL:         testURL,
 					Company:     testCompany,
-					Categories:  []string{testCategory},
+					Categories:  []string{"cloud"},
 					Description: testDescription,
 				},
 				&postmortems.Postmortem{
@@ -386,35 +383,28 @@ func TestGetPostmortemsByCategory(t *testing.T) {
 					UUID:        testUUID,
 					URL:         testURL,
 					Company:     testCompany,
-					Categories:  []string{testCategory},
+					Categories:  []string{"cloud"},
 					Description: testDescription,
 				},
 			},
 		},
 		{
-			name:     "successfully managing no valid category",
+			name:     "no matching category",
 			category: "not-valid",
 			pms: []*postmortems.Postmortem{
 				&postmortems.Postmortem{
 					UUID:        testUUID,
 					URL:         testURL,
 					Company:     testCompany,
-					Categories:  []string{testCategory},
+					Categories:  []string{"cloud"},
 					Description: testDescription,
-				},
-				&postmortems.Postmortem{
-					UUID:        "0ea35968-4578-408c-b4fd-8c6ccc3501b0",
-					URL:         "http://aws.amazon.com/message/4372T8/",
-					Company:     "Amazon",
-					Categories:  []string{"hardware"},
-					Description: "At 10:25pm PDT on June 4, loss of power at an AWS Sydney facility resulting from severe weather in that area lead to disruption to a significant number of instances in an Availability Zone. Due to the signature of the power loss, power  isolation breakers did not engage, resulting in backup energy reserves draining into the degraded power grid.",
 				},
 			},
 			want: []postmortems.Postmortem{},
 		},
 		{
 			name:     "empty postmortem list",
-			category: "postmortem",
+			category: "cloud",
 			pms:      []*postmortems.Postmortem{},
 			want:     []postmortems.Postmortem{},
 		},

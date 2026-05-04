@@ -15,25 +15,25 @@ func TestMatchCategories(t *testing.T) {
 		{
 			name:     "cloud and config",
 			body:     "We rolled out a bad config to our AWS EC2 fleet.",
-			existing: []string{catPostmortem},
+			existing: nil,
 			want:     []string{catCloud, catConfigChange},
 		},
 		{
 			name:     "skip already-present categories",
 			body:     "Cascading failure across the cluster after a misconfiguration.",
-			existing: []string{catPostmortem, catCascadingFailure},
+			existing: []string{catCascadingFailure},
 			want:     []string{catConfigChange},
 		},
 		{
 			name:     "no matches",
 			body:     "Nothing in this body should trigger anything.",
-			existing: []string{catPostmortem},
+			existing: nil,
 			want:     nil,
 		},
 		{
 			name:     "ntp triggers time",
 			body:     "An NTP misconfiguration confused our log timestamps.",
-			existing: []string{catPostmortem},
+			existing: nil,
 			want:     []string{catConfigChange, catTime},
 		},
 	}
@@ -51,15 +51,15 @@ func TestMatchCategories(t *testing.T) {
 }
 
 func TestMergeCategories(t *testing.T) {
-	// Order is the declaration order in postmortems.Categories.
-	got := mergeCategories([]string{catPostmortem}, []string{catCloud, catConfigChange})
-	want := []string{catCloud, catConfigChange, catPostmortem}
+	// Order follows the declaration order in postmortems.Categories.
+	got := mergeCategories(nil, []string{catCloud, catConfigChange})
+	want := []string{catCloud, catConfigChange}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("mergeCategories() = %v, want %v", got, want)
 	}
 
-	got = mergeCategories([]string{catPostmortem, catHardware}, []string{catHardware, catCloud})
-	want = []string{catCloud, catPostmortem, catHardware}
+	got = mergeCategories([]string{catHardware}, []string{catHardware, catCloud})
+	want = []string{catCloud, catHardware}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("mergeCategories() with overlap = %v, want %v", got, want)
 	}

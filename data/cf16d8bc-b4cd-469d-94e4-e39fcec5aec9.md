@@ -3,8 +3,7 @@ uuid: cf16d8bc-b4cd-469d-94e4-e39fcec5aec9
 url: https://medium.com/medium-eng/the-curious-case-of-disappearing-polish-s-fa398313d4df
 archive_url: https://web.archive.org/web/20160426163728if_/https://medium.com/medium-eng/the-curious-case-of-disappearing-polish-s-fa398313d4df
 title: Medium editor bug preventing Polish 'Ś' character input
-categories:
-- postmortem
+categories: []
 keywords:
 - polish
 - keyboard

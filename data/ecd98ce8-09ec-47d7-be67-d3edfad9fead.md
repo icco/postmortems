@@ -1,8 +1,7 @@
 ---
 uuid: ecd98ce8-09ec-47d7-be67-d3edfad9fead
 url: https://vzaar.com/blog/2017/02/22/mondays-outage-what-happened-how-well-prevent-it-from-happening-again/
-categories:
-- postmortem
+categories: []
 company: VZaar
 product: ""
 source_published_at: 2025-10-09T08:08:30Z

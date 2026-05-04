@@ -34,9 +34,7 @@
               <td data-sort-value="{{ range .Categories }}{{ . }} {{end}}">
                 <div class="flex flex-wrap gap-1">
                   {{ range .Categories }}
-                  {{ if ne . "postmortem" }}
                   <a href="/category/{{ . }}" class="badge badge-outline badge-sm capitalize whitespace-nowrap hover:badge-primary">{{ prettifyText . }}</a>
-                  {{ end }}
                   {{end}}
                 </div>
               </td>

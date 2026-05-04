@@ -8,7 +8,6 @@ categories:
 - automation
 - cloud
 - config-change
-- postmortem
 - time
 keywords:
 - google cloud

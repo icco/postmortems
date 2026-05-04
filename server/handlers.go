@@ -547,7 +547,6 @@ var categoryDescriptions = map[string]string{
 	"cascading-failure": "One small failure that snowballed: retries, thundering herds, or thread pool exhaustion that took out adjacent services.",
 	"cloud":             "Outages of, or caused by, public cloud providers (AWS, GCP, Azure, etc.) and their managed services.",
 	"config-change":     "Bad configuration pushed to production: feature flags, network ACLs, IAM policies, build settings, and routing rules.",
-	"postmortem":        "All entries with a published post-incident review. The default category every postmortem belongs to.",
 	"hardware":          "Disks, NICs, power, cooling, fibre cuts, and other physical-layer faults that took systems offline.",
 	"security":          "Outages caused by security incidents, mitigations, or hardening rollouts (revoked certs, blocked traffic, expired credentials).",
 	"time":              "NTP, leap seconds, timezone bugs, clock drift, and timestamp serialisation issues.",
@@ -578,8 +577,6 @@ func categoryEmoji(c string) string {
 		return "\U0001F512" // lock
 	case "time":
 		return "\u23F1\uFE0F" // stopwatch
-	case "postmortem":
-		return "\U0001F4D6" // book
 	case "undescriptive":
 		return "\u2754" // white question mark
 	}

@@ -37,8 +37,6 @@ const sampleHTML = `<!doctype html><html><head>
 const sampleEntry = `---
 uuid: "11111111-1111-1111-1111-111111111111"
 url: "%s"
-categories:
-- postmortem
 company: "ExampleCo"
 product: ""
 
@@ -204,8 +202,6 @@ uuid: "22222222-2222-2222-2222-222222222222"
 url: "` + origin.URL + `"
 title: "Hand-curated title"
 product: "Hand-curated product"
-categories:
-- postmortem
 company: "ExampleCo"
 
 ---
@@ -279,8 +275,6 @@ func TestEnrich_MaxAgeSkipsFresh(t *testing.T) {
 uuid: "33333333-3333-3333-3333-333333333333"
 url: "` + origin.URL + `"
 source_fetched_at: ` + time.Now().UTC().Format(time.RFC3339) + `
-categories:
-- postmortem
 company: "ExampleCo"
 
 ---
@@ -318,8 +312,6 @@ func TestEnrich_OnlyFiltersByUUID(t *testing.T) {
 		body := `---
 uuid: "` + id + `"
 url: "` + origin.URL + `"
-categories:
-- postmortem
 company: "ExampleCo"
 
 ---
@@ -359,8 +351,6 @@ func TestEnrich_RewritesWaybackURL(t *testing.T) {
 	body := `---
 uuid: "` + uuid + `"
 url: "` + wayback + `"
-categories:
-- postmortem
 company: "ExampleCo"
 
 ---

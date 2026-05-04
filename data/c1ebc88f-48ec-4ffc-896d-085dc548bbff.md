@@ -1,8 +1,7 @@
 ---
 uuid: c1ebc88f-48ec-4ffc-896d-085dc548bbff
 url: https://blog.thousandeyes.com/steam-outage-monitor-data-center-connectivity/
-categories:
-- postmortem
+categories: []
 company: Valve
 product: ""
 

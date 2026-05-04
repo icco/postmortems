@@ -5,7 +5,6 @@ title: incident.io GKE Dataplane V2 `anetd` CPU saturation causes connection tim
 categories:
 - cloud
 - config-change
-- postmortem
 keywords:
 - google cloud
 - gke
