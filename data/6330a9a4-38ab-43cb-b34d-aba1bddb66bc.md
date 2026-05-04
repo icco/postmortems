@@ -2,7 +2,11 @@
 uuid: 6330a9a4-38ab-43cb-b34d-aba1bddb66bc
 url: https://status.cloud.google.com/incidents/vLsxuKoRvykNHW3nnhsJ
 categories:
+- automation
+- cloud
+- config-change
 - postmortem
+- time
 company: Google
 product: ""
 
