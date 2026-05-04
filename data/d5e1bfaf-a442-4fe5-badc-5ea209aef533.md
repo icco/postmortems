@@ -7,7 +7,6 @@ categories:
 - automation
 - cloud
 - config-change
-- postmortem
 - hardware
 keywords:
 - aws

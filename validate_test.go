@@ -17,8 +17,6 @@ uuid: "11111111-1111-1111-1111-111111111111"
 url: "https://example.com/incident"
 start_time: 2024-03-20T00:00:00Z
 end_time: 2024-03-15T00:00:00Z
-categories:
-- postmortem
 company: "Example"
 product: ""
 
@@ -45,8 +43,6 @@ func TestValidateFile_EmptyDatesAllowed(t *testing.T) {
 	body := `---
 uuid: "22222222-2222-2222-2222-222222222222"
 url: "https://example.com/incident"
-categories:
-- postmortem
 company: "Example"
 product: ""
 

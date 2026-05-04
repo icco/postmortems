@@ -24,7 +24,6 @@ func TestParse(t *testing.T) {
 				UUID:        "01494547-7ee9-4169-a0c0-d921fa309d83",
 				URL:         "http://community.eveonline.com/news/dev-blogs/about-the-boot.ini-issue/",
 				Company:     "CCP Games",
-				Categories:  []string{categoryPostmortem},
 				Description: "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)",
 			},
 			wantErr: false,
@@ -61,8 +60,6 @@ func TestParseKeywords(t *testing.T) {
 uuid: "abc"
 url: "https://example.com/postmortem"
 company: "Example Inc"
-categories:
-- postmortem
 keywords:
 - dns
 - eu-west-1
@@ -91,8 +88,6 @@ uuid: "abc"
 url: "https://example.com/postmortem"
 title: "Example outage of 2024"
 company: "Example Inc"
-categories:
-- postmortem
 
 ---
 
@@ -107,7 +102,6 @@ Example body.
 		t.Errorf("Title = %q, want %q", got.Title, "Example outage of 2024")
 	}
 }
-
 
 func TestEventDatePeriod(t *testing.T) {
 	t.Parallel()

@@ -65,8 +65,6 @@ func (pm *Postmortem) EventDatePeriod() string {
 	}
 }
 
-const categoryPostmortem = "postmortem"
-
 var (
 	// Categories is a whitelist of valid categories that a postmortem can have.
 	Categories = []string{
@@ -74,7 +72,6 @@ var (
 		"cascading-failure",
 		"cloud",
 		"config-change",
-		categoryPostmortem,
 		"hardware",
 		"security",
 		"time",

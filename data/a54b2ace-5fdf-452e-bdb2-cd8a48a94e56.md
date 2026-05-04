@@ -2,8 +2,7 @@
 uuid: a54b2ace-5fdf-452e-bdb2-cd8a48a94e56
 url: https://engineering.fb.com/2021/10/05/networking-traffic/outage-details/
 title: Facebook global backbone network outage of October 2021
-categories:
-- postmortem
+categories: []
 keywords:
 - backbone network
 - dns

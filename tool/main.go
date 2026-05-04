@@ -71,7 +71,6 @@ var (
 			Prompt: &survey.MultiSelect{
 				Message:  "Select categories:",
 				Options:  postmortems.Categories,
-				Default:  catPostmortem,
 				PageSize: len(postmortems.Categories),
 			},
 		},

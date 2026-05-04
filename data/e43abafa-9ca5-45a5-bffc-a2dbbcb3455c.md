@@ -1,8 +1,7 @@
 ---
 uuid: e43abafa-9ca5-45a5-bffc-a2dbbcb3455c
 url: https://status.bintray.com/incidents/w4dfr0rpznkt
-categories:
-- postmortem
+categories: []
 company: Bintray
 product: ""
 

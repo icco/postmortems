@@ -1,37 +1,77 @@
-{{define "title"}}About postmortems.app{{end}}
+{{define "title"}}About | postmortems.app{{end}}
 
 {{define "body"}}
-<article class="pa3 pa5-ns mw8 center">
-    <p class="lh-copy">This project means to create a public repository of incident reports with annotated metadata and
-        summaries of public postmortem
-        documents. This repo takes the work in <a href="https://github.com/danluu/post-mortems" target="_blank">danluu/post-mortems</a>
-        repository
-        and expands on it, trying to add categories, time data, and room for more in-depth analysis.</p>
-    <p class="lh-copy">If you'd like to contribute, either edit a postmortem file in the data folder, or try to fix an
-        issue.</p>
+<article class="max-w-3xl mx-auto px-4 py-8">
+  <h1 class="text-3xl md:text-4xl font-semibold mb-2">About</h1>
+  <p class="text-base-content/70 mb-6">
+    A public, machine-readable corpus of post-incident reviews.
+  </p>
 
-    <p class="lh-copy">If you want further process the postmortem metadata files locally, we have a <a
-            href="/output/" target="_blank">folder</a> with all the metadata in JSON format. Please let us know your findings.</p>
+  <div class="prose max-w-none">
+    <p>
+      This project means to create a public repository of incident reports with annotated metadata
+      and summaries of public postmortem documents. It builds on
+      <a href="https://github.com/danluu/post-mortems" target="_blank" rel="noopener">danluu/post-mortems</a>
+      and expands it by adding categories, time data, and room for in-depth analysis.
+    </p>
+    <p>
+      If you'd like to contribute, edit a postmortem under
+      <a href="https://github.com/icco/postmortems/tree/main/data" target="_blank" rel="noopener">data/</a>
+      or <a href="https://github.com/icco/postmortems/issues" target="_blank" rel="noopener">open an issue</a>.
+    </p>
+    <p>
+      All entries are also available as JSON at
+      <a href="/output/" target="_blank"><code>/output/</code></a> &mdash; use it as a read-only API.
+      For postmortem templates from various companies, see
+      <a href="https://github.com/dastergon/postmortem-templates" target="_blank" rel="noopener">postmortem-templates</a>.
+    </p>
+    <p>
+      Maintained by <a href="https://natwelch.com/">@icco</a>,
+      <a href="https://dastergon.gr/">@dastergon</a>, and our
+      <a href="https://github.com/icco/postmortems/graphs/contributors">contributors</a>.
+    </p>
+  </div>
 
-    <p class="lh-copy">If you would like to find postmortem templates from various companies, you can check at the <a
-            href="https://github.com/dastergon/postmortem-templates" target="_blank">postmortem-templates</a> repository on Github.</p>
+  <h2 class="text-xl font-semibold mt-10 mb-3">Stats</h2>
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="stats shadow border border-base-300 bg-base-100">
+      <div class="stat py-3 px-4">
+        <div class="stat-title text-xs">Total postmortems</div>
+        <div class="stat-value text-2xl">{{ .TotalCount }}</div>
+      </div>
+    </div>
+    <div class="stats shadow border border-base-300 bg-base-100">
+      <div class="stat py-3 px-4">
+        <div class="stat-title text-xs">Unique companies</div>
+        <div class="stat-value text-2xl">{{ .CompanyCount }}</div>
+      </div>
+    </div>
+    <div class="stats shadow border border-base-300 bg-base-100">
+      <div class="stat py-3 px-4">
+        <div class="stat-title text-xs">Categories</div>
+        <div class="stat-value text-2xl">{{ len .Categories }}</div>
+      </div>
+    </div>
+    <div class="stats shadow border border-base-300 bg-base-100">
+      <div class="stat py-3 px-4">
+        <div class="stat-title text-xs">License</div>
+        <div class="stat-value text-2xl">GPL-3</div>
+      </div>
+    </div>
+  </div>
 
-    <p class="lh-copy">The repository of this app is <a href="https://github.com/icco/postmortems" target="_blank">available</a> on
-        Github.</p>
-    
-    <p class="lh-copy">This website is brought to you by <a href="https://natwelch.com/">@icco</a>, <a href="https://dastergon.gr/">@dastergon</a>,
-        and our merry band of <a href="https://github.com/icco/postmortems/graphs/contributors">contributors</a>!</p>
-
-    <h2 class="f3 f2-m f1-l">Stats</h2>
-    <dl class="lh-copy">
-        <dt class="fw6">Total postmortems</dt>
-        <dd class="ml0">{{ .TotalCount }}</dd>
-        <dt class="fw6">Unique companies</dt>
-        <dd class="ml0">{{ .CompanyCount }}</dd>
+  <h3 class="text-lg font-semibold mt-8 mb-3">Postmortems per category</h3>
+  <div class="card bg-base-100 border border-base-300 shadow-sm">
+    <div class="card-body p-0">
+      <ul class="divide-y divide-base-300">
         {{ range .Categories }}
-        <dt class="fw6">Category: {{ . }}</dt>
-        <dd class="ml0">{{ index $.CategoryCounts . }}</dd>
+        <li class="flex items-center justify-between px-4 py-2">
+          <a class="link link-hover capitalize" href="/category/{{ . }}">{{ . }}</a>
+          <span class="badge badge-ghost">{{ index $.CategoryCounts . }}</span>
+        </li>
         {{ end }}
-    </dl>
+      </ul>
+    </div>
+  </div>
 </article>
 {{end}}

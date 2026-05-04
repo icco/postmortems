@@ -63,8 +63,6 @@ func TestExtractPostmortems_SkipsWhenUpstreamIsArchiveOfExisting(t *testing.T) {
 	existingA := `---
 uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 url: "https://blog.example.com/outage-2022"
-categories:
-- postmortem
 company: "ExampleCo"
 
 ---
@@ -82,8 +80,6 @@ Body.
 uuid: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 url: "https://other.example.com/incident"
 archive_url: "https://web.archive.org/web/20210101000000/https://other.example.com/incident"
-categories:
-- postmortem
 company: "OtherCo"
 
 ---
@@ -99,8 +95,6 @@ Body.
 	existingC := `---
 uuid: "cccccccc-cccc-cccc-cccc-cccccccccccc"
 url: "https://web.archive.org/web/20180101000000/https://legacy.example.com/postmortem"
-categories:
-- postmortem
 company: "LegacyCo"
 
 ---
@@ -149,8 +143,6 @@ func TestExtractPostmortems_AdditiveImport(t *testing.T) {
 uuid: "11111111-1111-1111-1111-111111111111"
 url: "https://example.com/incident"
 title: "Hand-curated title"
-categories:
-- postmortem
 keywords:
 - dns
 company: "Example"

@@ -12,6 +12,7 @@ require (
 	github.com/icco/gutil v0.0.0-20260427022936-cf0231727770
 	github.com/prometheus/client_golang v1.23.2
 	github.com/russross/blackfriday/v2 v2.1.0
+	github.com/unrolled/secure v1.17.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.65.0

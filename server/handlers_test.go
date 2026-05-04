@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -19,8 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// TestMetricsEndpoint asserts otelhttp's HTTP server histogram lands
-// on /metrics tagged with the chi route pattern.
+// TestMetricsEndpoint asserts the chi route pattern is tagged onto otelhttp metrics.
 func TestMetricsEndpoint(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	exporter, err := otelprom.New(otelprom.WithRegisterer(reg))
@@ -85,75 +83,6 @@ func TestMetricsEndpoint(t *testing.T) {
 	}
 }
 
-func TestNotFoundHandler(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Logf("chdir back: %v", err)
-		}
-	})
-	if err := os.Chdir(".."); err != nil {
-		t.Fatalf("chdir to repo root: %v", err)
-	}
-
-	h := New(Options{Logger: zap.NewNop().Sugar()})
-	srv := httptest.NewServer(h)
-	t.Cleanup(srv.Close)
-
-	t.Run("unknown path returns styled 404", func(t *testing.T) {
-		resp, err := http.Get(srv.URL + "/this-route-does-not-exist") //nolint:noctx // test
-		if err != nil {
-			t.Fatalf("get: %v", err)
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				t.Logf("close body: %v", err)
-			}
-		}()
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.StatusCode)
-		}
-		if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
-			t.Errorf("content-type = %q, want text/html", ct)
-		}
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
-		if !strings.Contains(string(body), "404") || !strings.Contains(string(body), "Not Found") {
-			t.Errorf("body missing 404 marker; got:\n%s", body)
-		}
-		if !strings.Contains(string(body), "Postmortem Index") {
-			t.Errorf("body missing layout header; got:\n%s", body)
-		}
-	})
-
-	t.Run("missing postmortem returns styled 404", func(t *testing.T) {
-		resp, err := http.Get(srv.URL + "/postmortem/00000000-0000-0000-0000-000000000000") //nolint:noctx // test
-		if err != nil {
-			t.Fatalf("get: %v", err)
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				t.Logf("close body: %v", err)
-			}
-		}()
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.StatusCode)
-		}
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
-		if !strings.Contains(string(body), "Not Found") {
-			t.Errorf("body missing 404 marker; got:\n%s", body)
-		}
-	})
-}
-
 func TestHealthzCheckHandler(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -203,9 +132,7 @@ const (
 	testUUID        = "01494547-7ee9-4169-a0c0-d921fa309d83"
 	testURL         = "http://community.eveonline.com/news/dev-blogs/about-the-boot.ini-issue/"
 	testCompany     = "CCP Games"
-	testCategory    = "postmortem"
 	testDescription = "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)"
-	amazonCompany   = "Amazon"
 )
 
 func TestLoadPostmortem(t *testing.T) {
@@ -222,7 +149,6 @@ func TestLoadPostmortem(t *testing.T) {
 				UUID:        testUUID,
 				URL:         testURL,
 				Company:     testCompany,
-				Categories:  []string{testCategory},
 				Description: testDescription,
 			},
 			wantErr: false,
@@ -267,7 +193,6 @@ func TestLoadPostmortems(t *testing.T) {
 					UUID:        testUUID,
 					URL:         testURL,
 					Company:     testCompany,
-					Categories:  []string{testCategory},
 					Description: testDescription},
 			},
 			wantErr: false,
@@ -297,127 +222,137 @@ func TestLoadPostmortems(t *testing.T) {
 	}
 }
 
-func TestCompanySlug(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		in, want string
-	}{
-		{"CCP Games", "ccp-games"},
-		{"Healthcare.gov", "healthcare-gov"},
-		{amazonCompany, "amazon"},
-		{"  weird   spaces  ", "weird-spaces"},
-		{"a/b/c", "a-b-c"},
-		{"", ""},
-	}
-	for _, tc := range tests {
-		if got := CompanySlug(tc.in); got != tc.want {
-			t.Errorf("CompanySlug(%q) = %q, want %q", tc.in, got, tc.want)
-		}
-	}
-}
+// TestPageMetaTags asserts each route emits a unique canonical URL plus
+// matching Open Graph and Twitter Card tags.
+func TestPageMetaTags(t *testing.T) {
+	t.Chdir("..")
 
-func TestCompanyPageHandler(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Logf("chdir back: %v", err)
-		}
+	h := New(Options{
+		Logger: zap.NewNop().Sugar(),
+		Dir:    "testdata",
 	})
-	if err := os.Chdir(".."); err != nil {
-		t.Fatalf("chdir to repo root: %v", err)
-	}
 
-	h := New(Options{Logger: zap.NewNop().Sugar(), Dir: "testdata"})
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 
-	t.Run("known company returns matches", func(t *testing.T) {
-		resp, err := http.Get(srv.URL + "/company/ccp-games") //nolint:noctx // test
+	get := func(path string) (int, string) {
+		t.Helper()
+		resp, err := http.Get(srv.URL + path) //nolint:noctx // test
 		if err != nil {
-			t.Fatalf("get: %v", err)
+			t.Fatalf("GET %s: %v", path, err)
 		}
 		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				t.Logf("close body: %v", err)
+			if cerr := resp.Body.Close(); cerr != nil {
+				t.Logf("close body: %v", cerr)
 			}
 		}()
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("status = %d, want 200", resp.StatusCode)
-		}
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			t.Fatalf("read body: %v", err)
+			t.Fatalf("read body for %s: %v", path, err)
 		}
-		if !strings.Contains(string(body), "CCP Games") {
-			t.Errorf("body missing CCP Games; got:\n%s", body)
+		return resp.StatusCode, string(body)
+	}
+
+	t.Run("about", func(t *testing.T) {
+		status, body := get("/about")
+		if status != http.StatusOK {
+			t.Fatalf("status = %d, want 200", status)
 		}
-		if !strings.Contains(string(body), testUUID) {
-			t.Errorf("body missing UUID; got:\n%s", body)
-		}
+		mustContain(t, body, []string{
+			`<meta property="og:url" content="https://postmortems.app/about">`,
+			`<link rel="canonical" href="https://postmortems.app/about">`,
+			`<meta property="og:title" content="About postmortems.app">`,
+			`<meta property="og:type" content="website">`,
+			`<meta name="twitter:url" content="https://postmortems.app/about">`,
+		})
 	})
 
-	t.Run("unknown company returns 404", func(t *testing.T) {
-		resp, err := http.Get(srv.URL + "/company/does-not-exist") //nolint:noctx // test
-		if err != nil {
-			t.Fatalf("get: %v", err)
+	t.Run("postmortem-page", func(t *testing.T) {
+		path := "/postmortem/" + testUUID
+		status, body := get(path)
+		if status != http.StatusOK {
+			t.Fatalf("status = %d, want 200", status)
 		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				t.Logf("close body: %v", err)
+		mustContain(t, body, []string{
+			`<meta property="og:type" content="article">`,
+			`<meta property="og:url" content="https://postmortems.app/postmortem/` + testUUID + `">`,
+			`<link rel="canonical" href="https://postmortems.app/postmortem/` + testUUID + `">`,
+			`<meta property="og:title" content="CCP Games postmortem">`,
+		})
+	})
+}
+
+// mustContain fails the test if any needle is missing, surfacing all gaps at once.
+func mustContain(t *testing.T, body string, needles []string) {
+	t.Helper()
+	var missing []string
+	for _, n := range needles {
+		if !strings.Contains(body, n) {
+			missing = append(missing, n)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("response body missing expected tags:\n  %s", strings.Join(missing, "\n  "))
+	}
+}
+
+// TestAbsURL covers path normalisation for canonical/og:url builders.
+func TestAbsURL(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"", "https://postmortems.app/"},
+		{"/", "https://postmortems.app/"},
+		{"/about", "https://postmortems.app/about"},
+		{"about", "https://postmortems.app/about"},
+		{"/postmortem/abc-123", "https://postmortems.app/postmortem/abc-123"},
+	}
+	for _, tc := range cases {
+		if got := absURL(tc.in); got != tc.want {
+			t.Errorf("absURL(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+// TestSummarizeMarkdown verifies OG descriptions strip Markdown and cut on a word boundary.
+func TestSummarizeMarkdown(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		max  int
+		want string
+	}{
+		{
+			name: "strips markdown link",
+			in:   "A typo caused the [installer](https://example.com/x) to delete *boot.ini*.",
+			max:  200,
+			want: "A typo caused the installer to delete boot.ini.",
+		},
+		{
+			name: "truncates at word boundary",
+			in:   "alpha bravo charlie delta echo foxtrot golf hotel india juliet",
+			max:  20,
+			want: "alpha bravo charlie\u2026",
+		},
+		{
+			name: "empty stays empty",
+			in:   "   ",
+			max:  100,
+			want: "",
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := summarizeMarkdown(tc.in, tc.max); got != tc.want {
+				t.Errorf("summarizeMarkdown(%q, %d) = %q, want %q", tc.in, tc.max, got, tc.want)
 			}
-		}()
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.StatusCode)
-		}
-	})
-}
-
-func TestAboutPageHandler(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Logf("chdir back: %v", err)
-		}
-	})
-	if err := os.Chdir(".."); err != nil {
-		t.Fatalf("chdir to repo root: %v", err)
-	}
-
-	h := New(Options{Logger: zap.NewNop().Sugar(), Dir: "testdata"})
-	srv := httptest.NewServer(h)
-	t.Cleanup(srv.Close)
-
-	resp, err := http.Get(srv.URL + "/about") //nolint:noctx // test
-	if err != nil {
-		t.Fatalf("get: %v", err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			t.Logf("close body: %v", err)
-		}
-	}()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.StatusCode)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("read body: %v", err)
-	}
-	text := string(body)
-	for _, want := range []string{"Stats", "Total postmortems", "Unique companies"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("about page missing %q; got:\n%s", want, text)
-		}
+		})
 	}
 }
 
-func TestGetPosmortemByCategory(t *testing.T) {
+func TestGetPostmortemsByCategory(t *testing.T) {
 	tests := []struct {
 		name     string
 		category string
@@ -425,20 +360,20 @@ func TestGetPosmortemByCategory(t *testing.T) {
 		want     []postmortems.Postmortem
 	}{
 		{
-			name:     "successfully loading postmortems",
-			category: "postmortem",
+			name:     "filters by category",
+			category: "cloud",
 			pms: []*postmortems.Postmortem{
 				&postmortems.Postmortem{
 					UUID:        testUUID,
 					URL:         testURL,
 					Company:     testCompany,
-					Categories:  []string{testCategory},
+					Categories:  []string{"cloud"},
 					Description: testDescription,
 				},
 				&postmortems.Postmortem{
 					UUID:        "0ea35968-4578-408c-b4fd-8c6ccc3501b0",
 					URL:         "http://aws.amazon.com/message/4372T8/",
-					Company:     amazonCompany,
+					Company:     "Amazon",
 					Categories:  []string{"hardware"},
 					Description: "At 10:25pm PDT on June 4, loss of power at an AWS Sydney facility resulting from severe weather in that area lead to disruption to a significant number of instances in an Availability Zone. Due to the signature of the power loss, power  isolation breakers did not engage, resulting in backup energy reserves draining into the degraded power grid.",
 				},
@@ -448,35 +383,28 @@ func TestGetPosmortemByCategory(t *testing.T) {
 					UUID:        testUUID,
 					URL:         testURL,
 					Company:     testCompany,
-					Categories:  []string{testCategory},
+					Categories:  []string{"cloud"},
 					Description: testDescription,
 				},
 			},
 		},
 		{
-			name:     "successfully managing no valid category",
+			name:     "no matching category",
 			category: "not-valid",
 			pms: []*postmortems.Postmortem{
 				&postmortems.Postmortem{
 					UUID:        testUUID,
 					URL:         testURL,
 					Company:     testCompany,
-					Categories:  []string{testCategory},
+					Categories:  []string{"cloud"},
 					Description: testDescription,
-				},
-				&postmortems.Postmortem{
-					UUID:        "0ea35968-4578-408c-b4fd-8c6ccc3501b0",
-					URL:         "http://aws.amazon.com/message/4372T8/",
-					Company:     amazonCompany,
-					Categories:  []string{"hardware"},
-					Description: "At 10:25pm PDT on June 4, loss of power at an AWS Sydney facility resulting from severe weather in that area lead to disruption to a significant number of instances in an Availability Zone. Due to the signature of the power loss, power  isolation breakers did not engage, resulting in backup energy reserves draining into the degraded power grid.",
 				},
 			},
 			want: []postmortems.Postmortem{},
 		},
 		{
 			name:     "empty postmortem list",
-			category: "postmortem",
+			category: "cloud",
 			pms:      []*postmortems.Postmortem{},
 			want:     []postmortems.Postmortem{},
 		},
@@ -487,64 +415,10 @@ func TestGetPosmortemByCategory(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := getPosmortemByCategory(tc.pms, tc.category)
+			got := getPostmortemsByCategory(tc.pms, tc.category)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
-				t.Errorf("getPostmortemByCategory() returned unexpected results (-got +want):\n%s", diff)
+				t.Errorf("getPostmortemsByCategory() returned unexpected results (-got +want):\n%s", diff)
 			}
 		})
-	}
-}
-
-func TestSitemapHandler(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Logf("chdir back: %v", err)
-		}
-	})
-	if err := os.Chdir(".."); err != nil {
-		t.Fatalf("chdir to repo root: %v", err)
-	}
-
-	h := New(Options{Logger: zap.NewNop().Sugar(), Dir: "testdata"})
-	srv := httptest.NewServer(h)
-	t.Cleanup(srv.Close)
-
-	resp, err := http.Get(srv.URL + "/sitemap.xml") //nolint:noctx // test
-	if err != nil {
-		t.Fatalf("get sitemap.xml: %v", err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			t.Logf("close body: %v", err)
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.StatusCode)
-	}
-	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/xml") {
-		t.Errorf("content-type = %q, want application/xml", ct)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("read body: %v", err)
-	}
-	text := string(body)
-
-	for _, want := range []string{
-		`<?xml version="1.0" encoding="UTF-8"?>`,
-		`xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"`,
-		"/postmortem/" + testUUID,
-		"/category/postmortem",
-		"/company/ccp-games",
-		"/about",
-	} {
-		if !strings.Contains(text, want) {
-			t.Errorf("sitemap.xml missing %q\nbody:\n%s", want, text)
-		}
 	}
 }

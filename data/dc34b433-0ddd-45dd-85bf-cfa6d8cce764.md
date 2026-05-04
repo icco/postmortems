@@ -6,7 +6,6 @@ start_time: 2015-10-14T20:17:00Z
 end_time: 2015-10-15T14:20:00Z
 categories:
 - config-change
-- postmortem
 keywords:
 - linux
 - build queue

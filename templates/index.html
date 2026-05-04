@@ -1,36 +1,50 @@
 {{define "title"}}Postmortem Metadata Index{{end}}
 
 {{define "body"}}
-<div class="pa4">
-  <div class="overflow-auto">
-    <table id="postmortems-table" class="f6 w-100 mw8 center sortable" cellspacing="0">
-      <thead>
-        <tr>
-          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white sortable-th" data-sort-key="title">Title <span class="sort-arrow"></span></th>
-          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white sortable-th" data-sort-key="company">Company <span class="sort-arrow"></span></th>
-          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white sortable-th" data-sort-key="date">Date <span class="sort-arrow"></span></th>
-          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white sortable-th" data-sort-key="category">Category <span class="sort-arrow"></span></th>
-        </tr>
-      </thead>
-      <tbody class="lh-copy">
-        {{ range .Postmortems }}
-        <tr>
-          <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }}{{ end }}">
-            <a href="/postmortem/{{ .UUID }}">{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }}{{ end }}</a>
-          </td>
-          <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ .Company }}"><a href="/company/{{ companySlug .Company }}">{{ .Company }}</a></td>
-          <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ .EventDatePeriod }}">{{ .EventDatePeriod }}</td>
-          <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ range .Categories }}{{ . }} {{end}}">
-            {{ range .Categories }}
-            <a href="/category/{{ . }}">{{ . }}</a>
-            {{end}}
-          </td>
-
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
+<section class="max-w-6xl mx-auto px-4 py-8">
+  <div class="hidden sm:flex flex-wrap items-center gap-3 mb-6 text-sm text-base-content/70">
+    <span class="badge badge-soft badge-lg">{{ len .Postmortems }} postmortems</span>
+    <span>across</span>
+    <span class="badge badge-soft badge-lg">{{ len .Categories }} categories</span>
+    <span class="ml-auto opacity-70">Click any column header to sort.</span>
   </div>
-</div>
+
+  <div class="card bg-base-100 shadow-sm border border-base-300">
+    <div class="card-body p-0">
+      <div class="overflow-x-auto">
+        <table id="postmortems-table" class="table table-zebra table-sm sortable">
+          <thead class="bg-base-200/60 text-base-content">
+            <tr>
+              <th class="sortable-th cursor-pointer select-none" data-sort-key="title">Title <span class="sort-arrow opacity-60"></span></th>
+              <th class="sortable-th cursor-pointer select-none" data-sort-key="company">Company <span class="sort-arrow opacity-60"></span></th>
+              <th class="sortable-th cursor-pointer select-none whitespace-nowrap" data-sort-key="date">Date <span class="sort-arrow opacity-60"></span></th>
+              <th class="sortable-th cursor-pointer select-none" data-sort-key="category">Categories <span class="sort-arrow opacity-60"></span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ range .Postmortems }}
+            <tr class="hover">
+              <td data-sort-value="{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }}{{ end }}">
+                <a class="link link-hover font-medium" href="/postmortem/{{ .UUID }}">{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }}{{ end }}</a>
+              </td>
+              <td data-sort-value="{{ .Company }}">
+                <a class="link link-hover" href="/company/{{ companySlug .Company }}">{{ .Company }}</a>
+              </td>
+              <td class="whitespace-nowrap text-sm text-base-content/70" data-sort-value="{{ .EventDatePeriod }}">{{ .EventDatePeriod }}</td>
+              <td data-sort-value="{{ range .Categories }}{{ . }} {{end}}">
+                <div class="flex flex-wrap gap-1">
+                  {{ range .Categories }}
+                  <a href="/category/{{ . }}" class="badge badge-outline badge-sm capitalize whitespace-nowrap hover:badge-primary">{{ prettifyText . }}</a>
+                  {{end}}
+                </div>
+              </td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
 <script src="/sort-table.js"></script>
 {{end}}

@@ -18,16 +18,14 @@ const (
 	catHardware         = "hardware"
 	catSecurity         = "security"
 	catTime             = "time"
-	catPostmortem       = "postmortem"
 )
 
 // categoryPatterns maps a category name in postmortems.Categories to a
 // set of case-insensitive regular expressions. If any pattern matches
 // the body of a postmortem's source URL the category is suggested.
 //
-// We deliberately omit "postmortem" (every entry already has it) and
-// "undescriptive" (a subjective judgement that should not be
-// auto-applied).
+// "undescriptive" is omitted -- it's a subjective judgement that should
+// not be auto-applied.
 var categoryPatterns = map[string][]*regexp.Regexp{
 	catAutomation: {
 		mustRegex(`\bautomation\b`),

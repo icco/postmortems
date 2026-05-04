@@ -83,7 +83,7 @@ func TestTryParseTime(t *testing.T) {
 	cases := map[string]bool{
 		"2017-02-28T17:37:00Z":          true,
 		"2017-02-28":                    true,
-		"February 28, 2017":             true,  // matches "January 2, 2006"
+		"February 28, 2017":             true, // matches "January 2, 2006"
 		"Feb 28, 2017":                  true,
 		"":                              false,
 		"not a date":                    false,
@@ -96,4 +96,3 @@ func TestTryParseTime(t *testing.T) {
 		}
 	}
 }
-

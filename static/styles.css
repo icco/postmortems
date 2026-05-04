@@ -1,379 +1,73 @@
+/* Gap-fillers on top of the Tailwind/daisyUI CDN bundles. */
+
 html,
 body {
-  width: 100%;
   margin: 0;
   padding: 0;
 }
 
-body {
-  background: #fff;
-  color: #000;
-  font-family: "Roboto Mono", monospace;
+/* Prose styling for blackfriday-rendered Markdown (no Tailwind prose plugin via CDN). */
+.prose p {
+  margin: 0 0 1em;
+  line-height: 1.6;
 }
 
-article a, div a {
-  color: #2979FF;
-  font-weight:bold;
-  text-decoration: none;
+.prose ul,
+.prose ol {
+  margin: 0 0 1em 1.25em;
+  list-style: revert;
+  padding-left: 0.5em;
 }
 
-article a:focus, div a:focus,
-article a:hover, div a:hover {
-  color: #f0ad7a;
-  text-decoration: underline;
+.prose li {
+  margin: 0.25em 0;
 }
 
-ul {
-  margin: 0;
-  padding: 0;
-  list-style-type: none;
- }
-
- .dropdown {
-  display: inline-block;
-}
-
-.dropdown .dropbtn {
-  border: none;
-  outline: none;
-  padding: 14px 16px;
-  background-color: inherit;
-  font-family: inherit;
-  margin: 0;
-}
-
-.dropdown-content {
-  display: none;
-  position: absolute;
-  background-color: #f9f9f9;
-  min-width: 160px;
-  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-  z-index: 1;
-}
-
-.dropdown-content a {
-  float: none;
-  color: black;
-  padding: 12px 16px;
-  text-decoration: none;
-  display: block;
-  text-align: left;
-}
-
-.dropdown-content a:hover {
-  background-color: #ddd;
-}
-
-.dropdown:hover .dropdown-content {
-  display: block;
-}
-
-.dropdown:hover {
-  background-color: #fbf1a9;
-}
-
-.dropbtn a:hover {
-  background-color: lightgray;
-}
-
-.ba {
-    border-style: solid;
-    border-width: 1px;
-}
-
-.bt {
-    border-top-style: solid;
-    border-top-width: 1px;
-}
-
-.bb {
-    border-bottom-style: solid;
-    border-bottom-width: 1px;
-}
-
-.b--black {
-    border-color: #000;
-}
-
-.br-100 {
-    border-radius: 100%;
-}
-
-.dib {
-    display: inline-block;
-}
-
-.i {
-    font-style: italic;
-}
-
-.fw1 {
-    font-weight: 100;
-}
-
-.fw4 {
-    font-weight: 400;
-}
-
-.h2 {
-    height: 2rem;
-}
-
-.tracked {
-    letter-spacing: .1em;
-}
-
-.link {
-    text-decoration: none;
-    transition: color .15s ease-in;
-}
-
-.link:link, .link:visited {
-    transition: color .15s ease-in;
-}
-
-.link:hover {
-    transition: color .15s ease-in;
-}
-
-.link:active {
-    transition: color .15s ease-in;
-}
-
-.link:focus {
-    transition: color .15s ease-in;
-    outline: 1px dotted currentColor;
-}
-
-.mw7 {
-    max-width: 48rem;
-}
-
-.w2 {
-    width: 2rem;
-}
-
-.black-80 {
-    color: rgba(0, 0, 0, .8);
-}
-
-.white {
-    color: #fff;
-}
-
-.bg-black-80 {
-    background-color: rgba(0, 0, 0, .8);
-}
-
-.bg-white {
-    background-color: #fff;
-}
-
-.hover-bg-light-yellow:hover {
-    background-color: #fbf1a9;
-}
-
-.hover-bg-light-yellow:focus {
-    background-color: #fbf1a9;
-}
-
-.hover-bg-light-pink:hover {
-    background-color: #ffa3d7;
-}
-
-.hover-bg-light-pink:focus {
-    background-color: #ffa3d7;
-}
-
-.hover-bg-light-green:hover {
-    background-color: #9eebcf;
-}
-
-.hover-bg-light-green:focus {
-    background-color: #9eebcf;
-}
-
-.hover-bg-light-blue:hover {
-    background-color: #76c4e2;
-}
-
-.hover-bg-light-blue:focus {
-    background-color: #76c4e2;
-}
-
-.hover-bg-lightest-blue:hover {
-    background-color: #cdecff;
-}
-
-.hover-bg-lightest-blue:focus {
-    background-color: #cdecff;
-}
-
-.pa3 {
-    padding: 1rem;
-}
-
-.pv4 {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-}
-
-.mb0 {
-    margin-bottom: 0;
-}
-
-.mt2 {
-    margin-top: .5rem;
-}
-
-.mt4 {
-    margin-top: 2rem;
-}
-
-.tc {
-    text-align: center;
-}
-
-.ttu {
-    text-transform: uppercase;
-}
-
-.f1 {
-    font-size: 3rem;
-}
-
-.f6 {
-    font-size: .875rem;
-}
-
-.center {
-    margin-right: auto;
-    margin-left: auto;
-}
-
-.bg-animate, .bg-animate:hover, .bg-animate:focus {
-    transition: background-color .15s ease-in-out;
-}
-
-@media screen and (min-width: 60em) {
-    .ph4-l {
-        padding-left: 2rem;
-        padding-right: 2rem;
-    }
-
-    .f5-l {
-        font-size: 1rem;
-    }
-}
-
-.bb {
-    border-bottom-style: solid;
-    border-bottom-width: 1px;
-}
-
-.b--black-20 {
-    border-color: rgba(0, 0, 0, .2);
-}
-
-.fw6 {
-    font-weight: 600;
-}
-
-.lh-copy {
-    line-height: 1.5;
-}
-
-.mw8 {
-    max-width: 50rem;
-}
-
-.w-100 {
-    width: 100%;
-}
-
-.overflow-auto {
-    overflow: auto;
-}
-
-.bg-white {
-    background-color: #fff;
-}
-
-.pa4 {
-    padding: 1rem;
-}
-
-.pr3 {
-    padding-right: 1rem;
-}
-
-.pb3 {
-    padding-bottom: 1rem;
-}
-
-.pv3 {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-}
-
-.tl {
-    text-align: left;
-}
-
-.f6 {
-    font-size: .875rem;
-}
-
-.center {
-    margin-right: auto;
-    margin-left: auto;
-}
-
-.f3 {
-    font-size: 1rem;
-}
-
-.measure {
-    max-width: 30em;
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  margin: 1.5em 0 0.5em;
+  line-height: 1.25;
+  font-weight: 600;
 }
 
-@media screen and (min-width: 30em) {
-    .pa5-ns {
-        padding: 1rem;
-    }
+.prose code {
+  background-color: var(--color-base-200, #f3f3f3);
+  padding: 0.1em 0.35em;
+  border-radius: 0.25rem;
+  font-size: 0.9em;
 }
 
-@media screen and (min-width: 30em) and (max-width: 60em) {
-    .f2-m {
-        font-size: 2rem;
-    }
+.prose pre {
+  background-color: var(--color-base-200, #f3f3f3);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
 }
 
-@media screen and (min-width: 60em) {
-    .f1-l {
-        font-size: 2rem;
-    }
+.prose blockquote {
+  border-left: 3px solid var(--color-base-300, #d4d4d8);
+  padding-left: 1em;
+  color: var(--color-base-content, #333);
+  opacity: 0.85;
+  margin: 0 0 1em;
+  font-style: italic;
 }
 
+/* Sortable-table affordances for sort-table.js. */
 .sortable-th {
-    user-select: none;
+  user-select: none;
 }
 
-.sortable-th:hover {
-    background-color: #f6f6f6;
+.sortable-th:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
 }
 
 .sort-arrow {
-    color: #666;
-    font-size: .75rem;
-}
-
-.keyword {
-    display: inline-block;
-    background-color: #f0f0f0;
-    color: #333;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: .8rem;
-    margin: 0 2px;
+  display: inline-block;
+  min-width: 0.6em;
+  color: inherit;
+  font-size: 0.75rem;
 }

@@ -8,7 +8,6 @@ end_time: 2017-03-16T20:12:00Z
 categories:
 - cloud
 - config-change
-- postmortem
 - security
 keywords:
 - square

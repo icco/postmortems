@@ -1,30 +1,151 @@
-{{define "title"}}{{ .Company }} postmortems{{end}}
+{{define "title"}}{{ .Company }} postmortems | postmortems.app{{end}}
 
 {{define "body"}}
-<div class="pa4">
-  <div class="overflow-auto">
-    <h1 class="f3 f2-m f1-l mw8 center">{{ .Company }}</h1>
-    <p class="lh-copy mw8 center">Postmortems associated with <strong>{{ .Company }}</strong>.</p>
-    <table class="f6 w-100 mw8 center" cellspacing="0">
-      <thead>
-        <tr>
-          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">UUID</th>
-          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">Category</th>
-        </tr>
-      </thead>
-      <tbody class="lh-copy">
-        {{ range .Postmortems }}
-        <tr>
-          <td class="pv3 pr3 bb b--black-20"><a href="/postmortem/{{ .UUID }}">{{ .UUID }}</a></td>
-          <td class="pv3 pr3 bb b--black-20">
-            {{ range .Categories }}
-            <a href="/category/{{ . }}">{{ . }}</a>
-            {{end}}
-          </td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
+<section class="max-w-6xl mx-auto px-4 py-8">
+
+  <div class="text-sm breadcrumbs text-base-content/60 mb-3 max-w-full overflow-x-auto">
+    <ul>
+      <li><a href="/" class="link link-hover">Index</a></li>
+      <li class="truncate max-w-[20ch] sm:max-w-none">{{ .Company }}</li>
+    </ul>
   </div>
-</div>
+
+  <header class="card bg-base-100 border border-base-300 shadow-sm mb-6">
+    <div class="card-body p-6 md:p-8">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.2em] text-base-content/50">Company</p>
+          <h1 class="text-3xl md:text-4xl font-semibold mt-1">{{ .Company }}</h1>
+          <p class="mt-2 text-base-content/70 max-w-prose">
+            {{ len .Postmortems }} published postmortem{{ if ne (len .Postmortems) 1 }}s{{ end }}
+            tracked here{{ if .DateRange }}, spanning <span class="font-medium">{{ .DateRange }}</span>{{ end }}.
+          </p>
+        </div>
+        <div class="flex flex-col items-end gap-2 text-right">
+          <a href="https://www.google.com/search?q={{ .Company }}+postmortem" target="_blank" rel="noopener"
+            class="btn btn-ghost btn-sm">Search the web &rarr;</a>
+          <a href="https://github.com/icco/postmortems/issues/new?title=Add+postmortem+for+{{ .Company }}"
+            target="_blank" rel="noopener" class="btn btn-outline btn-sm">Suggest a postmortem</a>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-6">
+        <div class="stats border border-base-300 bg-base-200/40">
+          <div class="stat py-2 px-3 sm:py-3 sm:px-4">
+            <div class="stat-title text-xs">Postmortems</div>
+            <div class="stat-value text-xl sm:text-2xl">{{ len .Postmortems }}</div>
+          </div>
+        </div>
+        <div class="stats border border-base-300 bg-base-200/40">
+          <div class="stat py-2 px-3 sm:py-3 sm:px-4">
+            <div class="stat-title text-xs">Categories</div>
+            <div class="stat-value text-xl sm:text-2xl">{{ len .CategoryCounts }}</div>
+          </div>
+        </div>
+        <div class="stats border border-base-300 bg-base-200/40">
+          <div class="stat py-2 px-3 sm:py-3 sm:px-4">
+            <div class="stat-title text-xs">Years covered</div>
+            <div class="stat-value text-xl sm:text-2xl">{{ if .SpanYears }}{{ .SpanYears }}{{ else }}&mdash;{{ end }}</div>
+          </div>
+        </div>
+        <div class="stats border border-base-300 bg-base-200/40">
+          <div class="stat py-2 px-3 sm:py-3 sm:px-4">
+            <div class="stat-title text-xs">Products</div>
+            <div class="stat-value text-xl sm:text-2xl">{{ if .Products }}{{ len .Products }}{{ else }}&mdash;{{ end }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem] gap-6 items-start">
+
+    <div class="card bg-base-100 border border-base-300 shadow-sm order-2 lg:order-1 min-w-0">
+      <div class="card-body p-0">
+        <div class="overflow-x-auto">
+          <table class="table table-zebra table-sm">
+            <thead class="bg-base-200/60">
+              <tr>
+                <th>Title</th>
+                <th class="whitespace-nowrap">Date</th>
+                <th>Categories</th>
+                <th class="text-right">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range .Postmortems }}
+              <tr class="hover">
+                <td>
+                  <a class="link link-hover font-medium" href="/postmortem/{{ .UUID }}">
+                    {{ if .Title }}{{ .Title }}{{ else }}Untitled postmortem{{ end }}
+                  </a>
+                  {{ if .Product }}<div class="text-xs text-base-content/60 mt-0.5">{{ .Product }}</div>{{ end }}
+                </td>
+                <td class="text-xs text-base-content/70 whitespace-nowrap">{{ .EventDatePeriod }}</td>
+                <td>
+                  <div class="flex flex-wrap gap-1">
+                    {{ range .Categories }}
+                    <a href="/category/{{ . }}" class="badge badge-outline badge-sm capitalize whitespace-nowrap hover:badge-primary">{{ prettifyText . }}</a>
+                    {{ end }}
+                  </div>
+                </td>
+                <td class="text-right whitespace-nowrap">
+                  {{ if .URL }}<a class="link link-hover text-xs" href="{{ .URL }}" target="_blank" rel="noopener">Original &rarr;</a>{{ end }}
+                </td>
+              </tr>
+              {{ end }}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <aside class="space-y-4 order-1 lg:order-2">
+      <div class="card bg-base-100 border border-base-300 shadow-sm">
+        <div class="card-body p-5">
+          <h2 class="font-semibold text-sm uppercase tracking-wider text-base-content/60">Failure modes</h2>
+          {{ if .CategoryCounts }}
+          <ul class="mt-3 space-y-1.5">
+            {{ range .CategoryCounts }}
+            <li class="flex items-center justify-between gap-2">
+              <a href="/category/{{ .Name }}" class="link link-hover capitalize text-sm">{{ categoryEmoji .Name }} {{ .Name }}</a>
+              <span class="badge badge-ghost badge-sm">{{ .Count }}</span>
+            </li>
+            {{ end }}
+          </ul>
+          {{ else }}
+          <p class="text-sm text-base-content/60 mt-2">No category data yet.</p>
+          {{ end }}
+        </div>
+      </div>
+
+      {{ if .Products }}
+      <div class="card bg-base-100 border border-base-300 shadow-sm">
+        <div class="card-body p-5">
+          <h2 class="font-semibold text-sm uppercase tracking-wider text-base-content/60">Products</h2>
+          <ul class="mt-3 space-y-1.5">
+            {{ range .Products }}
+            <li class="flex items-center justify-between gap-2">
+              <span class="text-sm">{{ .Name }}</span>
+              <span class="badge badge-ghost badge-sm">{{ .Count }}</span>
+            </li>
+            {{ end }}
+          </ul>
+        </div>
+      </div>
+      {{ end }}
+
+      <div class="card bg-base-100 border border-base-300 shadow-sm">
+        <div class="card-body p-5 text-sm">
+          <h2 class="font-semibold text-sm uppercase tracking-wider text-base-content/60">About this page</h2>
+          <p class="mt-2 text-base-content/70">
+            Each row links to a structured summary; the original source is one click away.
+            Got another <strong>{{ .Company }}</strong> postmortem we should add?
+            <a class="link link-hover" href="https://github.com/icco/postmortems/issues/new?title=Add+postmortem+for+{{ .Company }}" target="_blank" rel="noopener">Open an issue.</a>
+          </p>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
 {{end}}
