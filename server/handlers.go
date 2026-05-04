@@ -163,7 +163,7 @@ func secureOptions() secure.Options {
 		"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 		"img-src 'self' data:",
 		"font-src 'self' data: https://cdn.jsdelivr.net",
-		"connect-src 'self' " + reportdHost,
+		"connect-src 'self' " + reportdHost + " https://cdn.jsdelivr.net",
 		"object-src 'none'",
 		"base-uri 'self'",
 		"frame-ancestors 'none'",
