@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -87,15 +88,15 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (FetchResult, error)
 	}
 
 	if archive == "" {
-		return res, fmt.Errorf("origin failed (%v) and no wayback snapshot available", originErr)
+		return res, fmt.Errorf("origin failed and no wayback snapshot available: %w", originErr)
 	}
 
 	html, status, archiveErr := f.get(ctx, archive)
 	if archiveErr != nil {
-		return res, fmt.Errorf("origin failed (%v); wayback failed (%v)", originErr, archiveErr)
+		return res, fmt.Errorf("origin failed and wayback fetch failed: %w", errors.Join(originErr, archiveErr))
 	}
 	if status < 200 || status >= 300 {
-		return res, fmt.Errorf("origin failed (%v); wayback returned status %d", originErr, status)
+		return res, fmt.Errorf("origin failed and wayback returned status %d: %w", status, originErr)
 	}
 	res.RawHTML = html
 	res.FinalURL = archive

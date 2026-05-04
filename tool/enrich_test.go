@@ -64,7 +64,7 @@ func writeSampleEntry(t *testing.T, dir, originURL string) string {
 // the rest of the codebase uses.
 func readPM(t *testing.T, fp string) *postmortems.Postmortem {
 	t.Helper()
-	f, err := os.Open(fp)
+	f, err := os.Open(fp) // #nosec G304 -- path is t.TempDir() in tests
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestEnrich_DryRunDoesNotWrite(t *testing.T) {
 
 	dir := t.TempDir()
 	fp := writeSampleEntry(t, dir, origin.URL)
-	original, _ := os.ReadFile(fp)
+	original, _ := os.ReadFile(fp) // #nosec G304 -- path is t.TempDir() in tests
 
 	llm := &fakeLLM{resp: EnrichOutput{
 		ExpandedDescription: "new body",
@@ -166,7 +166,7 @@ func TestEnrich_DryRunDoesNotWrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Enrich: %v", err)
 	}
-	after, _ := os.ReadFile(fp)
+	after, _ := os.ReadFile(fp) // #nosec G304 -- path is t.TempDir() in tests
 	if string(original) != string(after) {
 		t.Errorf("dry-run modified file on disk")
 	}

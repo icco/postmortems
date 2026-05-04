@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -217,6 +218,8 @@ func runEnrich() error {
 	}
 	defer func() { _ = llm.Close() }()
 
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
 	res, err := EnrichPostmortems(ctx, enrichOptions{
 		Dir:             *dir,
 		Only:            *enrichOnly,
@@ -227,11 +230,12 @@ func runEnrich() error {
 		HTTPTimeout:     *categorizeTime,
 		Concurrency:     *enrichWorkers,
 		LLM:             llm,
+		Logger:          logger,
 	})
 	if err != nil {
 		return err
 	}
-	printEnrichReport(os.Stdout, res, *categorizeApply)
+	LogEnrichReport(logger, res, *categorizeApply)
 	return nil
 }
 

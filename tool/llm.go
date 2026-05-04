@@ -183,30 +183,30 @@ func buildPrompt(in EnrichInput) string {
 	sb.WriteString("- notes is optional free text explaining anything that needed to be left blank.\n\n")
 
 	sb.WriteString("Existing entry context:\n")
-	sb.WriteString(fmt.Sprintf("- Company: %s\n", nonEmpty(in.Company)))
-	sb.WriteString(fmt.Sprintf("- Source URL: %s\n", in.URL))
+	fmt.Fprintf(&sb, "- Company: %s\n", nonEmpty(in.Company))
+	fmt.Fprintf(&sb, "- Source URL: %s\n", in.URL)
 	if in.Existing != nil {
 		if in.Existing.Title != "" {
-			sb.WriteString(fmt.Sprintf("- Existing title: %s\n", in.Existing.Title))
+			fmt.Fprintf(&sb, "- Existing title: %s\n", in.Existing.Title)
 		}
 		if in.Existing.Product != "" {
-			sb.WriteString(fmt.Sprintf("- Existing product: %s\n", in.Existing.Product))
+			fmt.Fprintf(&sb, "- Existing product: %s\n", in.Existing.Product)
 		}
 		if in.Existing.Description != "" {
-			sb.WriteString(fmt.Sprintf("- Existing one-line summary: %s\n", strings.TrimSpace(in.Existing.Description)))
+			fmt.Fprintf(&sb, "- Existing one-line summary: %s\n", strings.TrimSpace(in.Existing.Description))
 		}
 	}
 	if in.UsedArchive {
 		sb.WriteString("- Note: source was retrieved from the Wayback Machine because the original URL is dead.\n")
 	}
 	if !in.PageDate.IsZero() {
-		sb.WriteString(fmt.Sprintf("- Page published date (publication, not incident): %s\n", in.PageDate.UTC().Format(time.RFC3339)))
+		fmt.Fprintf(&sb, "- Page published date (publication, not incident): %s\n", in.PageDate.UTC().Format(time.RFC3339))
 	}
 	if in.PageAuthor != "" {
-		sb.WriteString(fmt.Sprintf("- Page author: %s\n", in.PageAuthor))
+		fmt.Fprintf(&sb, "- Page author: %s\n", in.PageAuthor)
 	}
 	if in.PageTitle != "" {
-		sb.WriteString(fmt.Sprintf("- Page title: %s\n", in.PageTitle))
+		fmt.Fprintf(&sb, "- Page title: %s\n", in.PageTitle)
 	}
 
 	sb.WriteString("\nArticle text (may be truncated):\n")

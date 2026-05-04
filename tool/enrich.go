@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -26,7 +26,8 @@ type enrichOptions struct {
 	MaxAge          time.Duration
 	HTTPTimeout     time.Duration
 	Concurrency     int
-	LLM             LLMClient // injectable for tests
+	LLM             LLMClient    // injectable for tests
+	Logger          *slog.Logger // diagnostics; defaults to slog.Default()
 }
 
 // enrichResult records the outcome of processing one .md file. Err is
@@ -63,6 +64,9 @@ func EnrichPostmortems(ctx context.Context, opts enrichOptions) ([]enrichResult,
 	}
 	if opts.LLM == nil {
 		return nil, fmt.Errorf("LLM client is required")
+	}
+	if opts.Logger == nil {
+		opts.Logger = slog.Default()
 	}
 
 	files, err := os.ReadDir(opts.Dir)
@@ -309,10 +313,14 @@ func firstNonEmpty(s ...string) string {
 	return ""
 }
 
-// printEnrichReport renders a human-readable summary of res to w.
-// Errors writing the report are not actionable, so they are
-// intentionally ignored — matching the categorize report convention.
-func printEnrichReport(w io.Writer, res []enrichResult, apply bool) {
+// LogEnrichReport emits one structured log event per enrichment result
+// plus a summary line. Logger may be nil, in which case slog.Default()
+// is used. Mirrors the shape of the categorize tool's text report but
+// rides on slog so the output is filterable / re-handlable.
+func LogEnrichReport(logger *slog.Logger, res []enrichResult, apply bool) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	var (
 		processed    int
 		updated      int
@@ -323,43 +331,49 @@ func printEnrichReport(w io.Writer, res []enrichResult, apply bool) {
 	)
 	for _, r := range res {
 		processed++
+		base := filepath.Base(r.Path)
 		if r.Skipped != "" {
 			skipped++
+			logger.Debug("enrich skipped", "file", base, "reason", r.Skipped)
 			continue
 		}
 		if r.UsedArchive {
 			archiveCount++
 		}
 		if r.Err != nil {
-			marker := "ERR"
-			if strings.HasPrefix(r.Err.Error(), "fetch:") {
+			kind := "error"
+			switch {
+			case strings.HasPrefix(r.Err.Error(), "fetch:"):
 				fetchErrs++
-				marker = "FETCH"
-			} else if strings.HasPrefix(r.Err.Error(), "llm:") {
+				kind = "fetch"
+			case strings.HasPrefix(r.Err.Error(), "llm:"):
 				llmErrs++
-				marker = "LLM"
+				kind = "llm"
 			}
-			_, _ = fmt.Fprintf(w, "%s  %s (%s): %v\n", marker, filepath.Base(r.Path), r.URL, r.Err)
+			logger.Error("enrich failed", "file", base, "url", r.URL, "kind", kind, "err", r.Err)
 			continue
 		}
 		if len(r.Changed) == 0 {
+			logger.Debug("enrich no-op", "file", base, "url", r.URL)
 			continue
 		}
 		updated++
-		marker := "WOULD"
-		if apply {
-			marker = "WROTE"
-		}
-		archive := ""
-		if r.UsedArchive {
-			archive = " [via wayback]"
-		}
-		conf := ""
-		if r.Confidence != "" {
-			conf = " conf=" + r.Confidence
-		}
-		_, _ = fmt.Fprintf(w, "%s %s%s%s -> %v\n", marker, filepath.Base(r.Path), archive, conf, r.Changed)
+		logger.Info("enriched",
+			"file", base,
+			"url", r.URL,
+			"applied", apply,
+			"used_archive", r.UsedArchive,
+			"confidence", r.Confidence,
+			"changed", r.Changed,
+		)
 	}
-	_, _ = fmt.Fprintf(w, "\nprocessed=%d  updated=%d  skipped=%d  archive-fallback=%d  fetch-errors=%d  llm-errors=%d\n",
-		processed, updated, skipped, archiveCount, fetchErrs, llmErrs)
+	logger.Info("enrich summary",
+		"processed", processed,
+		"updated", updated,
+		"skipped", skipped,
+		"archive_fallback", archiveCount,
+		"fetch_errors", fetchErrs,
+		"llm_errors", llmErrs,
+		"applied", apply,
+	)
 }
