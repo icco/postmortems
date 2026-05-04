@@ -7,12 +7,9 @@ import (
 	"testing"
 )
 
-// TestExtractPostmortems_NewWaybackEntryIsPreUnwrapped asserts that a
-// brand-new upstream entry whose URL is a Wayback snapshot lands on
-// disk with the origin URL in `url:` and the snapshot in
-// `archive_url:`, matching the post-enrich representation. Without
-// this, the same entry would canonicalise differently before vs after
-// enrichment and a re-import could miss the match.
+// New entries whose upstream URL is itself a Wayback snapshot must
+// land on disk pre-unwrapped (origin in url, snapshot in archive_url),
+// so re-imports of the same line are a no-op.
 func TestExtractPostmortems_NewWaybackEntryIsPreUnwrapped(t *testing.T) {
 	t.Parallel()
 
@@ -53,11 +50,9 @@ func TestExtractPostmortems_NewWaybackEntryIsPreUnwrapped(t *testing.T) {
 	}
 }
 
-// TestExtractPostmortems_SkipsWhenUpstreamIsArchiveOfExisting verifies
-// that when danluu/post-mortems lists a Wayback snapshot, the import
-// recognises it as the same resource as a local entry that already
-// stores either the origin URL (post-enrich) or a different snapshot
-// in archive_url, and skips it instead of creating a duplicate.
+// When upstream lists a Wayback snapshot for an entry we already have
+// (in either origin or archive form), the import must skip it instead
+// of creating a duplicate.
 func TestExtractPostmortems_SkipsWhenUpstreamIsArchiveOfExisting(t *testing.T) {
 	t.Parallel()
 
@@ -142,11 +137,9 @@ Body.
 	}
 }
 
-// TestExtractPostmortems_AdditiveImport asserts the extractor:
-//   - leaves an existing entry alone when the upstream URL canonicalises
-//     to the same resource (so enriched fields aren't clobbered),
-//   - creates a fresh file for each new upstream URL,
-//   - skips malformed lines that capture multiple URLs in one match.
+// ExtractPostmortems must leave existing entries untouched when the
+// upstream URL canonicalises to the same resource, save fresh files
+// for genuinely new URLs, and skip malformed multi-link lines.
 func TestExtractPostmortems_AdditiveImport(t *testing.T) {
 	t.Parallel()
 

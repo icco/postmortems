@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -52,12 +53,8 @@ func NewGeminiClient(ctx context.Context, project, location, modelName string) (
 	if project == "" {
 		return nil, fmt.Errorf("gcp project is required (set -gcp-project or GOOGLE_CLOUD_PROJECT)")
 	}
-	if location == "" {
-		location = "us-central1"
-	}
-	if modelName == "" {
-		modelName = "gemini-2.5-flash"
-	}
+	location = cmp.Or(location, "us-central1")
+	modelName = cmp.Or(modelName, "gemini-2.5-flash")
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		Backend:  genai.BackendVertexAI,
@@ -163,7 +160,7 @@ func buildPrompt(in EnrichInput) string {
 	sb.WriteString("- notes is optional free text explaining anything that needed to be left blank.\n\n")
 
 	sb.WriteString("Existing entry context:\n")
-	fmt.Fprintf(&sb, "- Company: %s\n", nonEmpty(in.Company))
+	fmt.Fprintf(&sb, "- Company: %s\n", cmp.Or(in.Company, "(unknown)"))
 	fmt.Fprintf(&sb, "- Source URL: %s\n", in.URL)
 	if in.Existing != nil {
 		if in.Existing.Title != "" {
@@ -191,13 +188,6 @@ func buildPrompt(in EnrichInput) string {
 	sb.WriteString(in.PageText)
 	sb.WriteString("\n---\n")
 	return sb.String()
-}
-
-func nonEmpty(s string) string {
-	if s == "" {
-		return "(unknown)"
-	}
-	return s
 }
 
 // enrichSchema is the OpenAPI schema for the Gemini JSON response.

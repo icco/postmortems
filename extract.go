@@ -27,17 +27,15 @@ var (
 type ImportReport struct {
 	Source          string        // URL or file path that was read
 	Added           []*Postmortem // entries newly written to disk
-	SkippedExisting int           // upstream entries already in dir (canonical URL match)
-	SkippedInvalid  int           // upstream lines rejected (malformed URL etc.)
+	SkippedExisting int           // upstream entries already in dir
+	SkippedInvalid  int           // malformed/rejected upstream lines
 }
 
-// ExtractPostmortems imports each postmortem entry from loc into its
-// own file under dir. The import is additive: an entry whose URL
-// canonicalises to one already present in dir is skipped, so previously
-// enriched fields (title, dates, archive URL, summary, expanded body
-// etc.) are preserved across re-imports. The returned report lists the
-// freshly-saved entries so callers can chain follow-up work (e.g.
-// enrichment) without re-scanning the directory.
+// ExtractPostmortems writes each postmortem entry from loc into its own
+// file under dir. The import is additive: entries whose canonical URL
+// already exists in dir are skipped, so previously enriched fields are
+// preserved. The returned report lists freshly-saved entries so callers
+// can chain follow-up work without rescanning the directory.
 func ExtractPostmortems(loc string, dir string) (*ImportReport, error) {
 	posts, err := ValidateDir(dir)
 	if err != nil {
@@ -102,14 +100,11 @@ func ExtractPostmortems(loc string, dir string) (*ImportReport, error) {
 			continue
 		}
 
-		// If the upstream URL is itself a Wayback snapshot, store the
-		// origin URL in `url:` and the snapshot in `archive_url:` from
-		// the start. This matches the post-enrich representation, so
-		// the file shape is the same whether or not the LLM step ever
-		// runs and re-imports stay idempotent.
+		// Pre-unwrap Wayback snapshots so the file shape matches the
+		// post-enrich representation and re-imports stay idempotent.
 		entryURL := rawURL
 		var archiveURL string
-		if origin, snapshot, ok := unwrapWayback(rawURL); ok {
+		if origin, snapshot, ok := ParseWaybackURL(rawURL); ok {
 			entryURL = origin
 			archiveURL = snapshot
 		}

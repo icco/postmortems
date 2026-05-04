@@ -512,7 +512,7 @@ func TestApplyTitle(t *testing.T) {
 // disk or the network.
 func TestMergeKeywords(t *testing.T) {
 	t.Parallel()
-	got, added := mergeKeywords([]string{"a", "b"}, []string{"B", "c"}, false)
+	got, added := mergeKeywords([]string{"a", "b"}, []string{"B", "c"})
 	if !added {
 		t.Fatal("expected added=true")
 	}
@@ -521,7 +521,7 @@ func TestMergeKeywords(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got, added = mergeKeywords([]string{"a"}, []string{"a"}, false)
+	got, added = mergeKeywords([]string{"a"}, []string{"a"})
 	if added {
 		t.Errorf("expected no additions for duplicate, got added=true (%v)", got)
 	}

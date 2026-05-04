@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -9,26 +10,16 @@ import (
 	"github.com/icco/postmortems"
 )
 
-// danluuReadme is the canonical upstream postmortem list. Imports
-// without a -source flag pull from this URL.
+// danluuReadme is the default upstream source.
 const danluuReadme = "https://raw.githubusercontent.com/danluu/post-mortems/master/README.md"
 
-// importOptions configures one RunImport call. NoEnrich and missing
-// LLMs are both treated as "skip the enrich step" so the action stays
-// useful in CI/cron environments without GCP credentials.
+// importOptions configures one RunImport call.
 type importOptions struct {
 	Dir      string
-	Source   string // URL or file path; empty means danluu upstream
+	Source   string // URL or file path; empty means danluuReadme
 	NoEnrich bool
-
-	// Enrich is applied (with Apply=true and Only set to the
-	// freshly-added UUIDs) when NoEnrich is false and Enrich.LLM is
-	// non-nil. Other Enrich fields (Force, KeepDescription, MaxAge,
-	// HTTPTimeout, Concurrency, Logger) carry the caller's preferences
-	// through unchanged.
-	Enrich enrichOptions
-
-	Logger *slog.Logger
+	Enrich   enrichOptions
+	Logger   *slog.Logger
 }
 
 // importResult is the consolidated outcome of an import + enrich pass.
@@ -39,13 +30,10 @@ type importResult struct {
 }
 
 // RunImport pulls the source list, additively saves any new entries,
-// and (unless disabled) enriches just those new entries via the LLM.
-// Existing entries are never modified, so this is safe to run on a
-// timer.
+// and (unless disabled) enriches just those new entries. Existing
+// entries are never modified, so it is safe to run on a timer.
 func RunImport(ctx context.Context, opts importOptions) (*importResult, error) {
-	if opts.Source == "" {
-		opts.Source = danluuReadme
-	}
+	opts.Source = cmp.Or(opts.Source, danluuReadme)
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}

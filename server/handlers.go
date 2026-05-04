@@ -162,7 +162,7 @@ var templateFuncs = template.FuncMap{
 
 // renderTemplate parses layout.html + view and writes the response.
 // Uses html/template so {{ .Field }} interpolations are HTML-escaped.
-func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data interface{}) {
+func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data any) {
 	l := logging.FromContext(r.Context())
 	lp := filepath.Join("templates", "layout.html")
 	fp := filepath.Join("templates", view)

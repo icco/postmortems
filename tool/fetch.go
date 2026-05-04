@@ -8,33 +8,15 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/icco/postmortems"
 )
 
 const userAgent = "icco-postmortems-enricher/1.0 (+https://postmortems.app)"
 const maxBody = 4 * 1024 * 1024 // 4 MiB
-
-// waybackURL matches https?://web.archive.org/web/<timestamp>[flags]/<origin>.
-// flags is the optional 1-3 char suffix Wayback uses to vary the
-// rendering ("if_", "id_", "js_", etc.).
-var waybackURL = regexp.MustCompile(`^https?://web\.archive\.org/web/(\d+)([a-z_]{0,4})/(https?://.+)$`)
-
-// ParseWaybackURL splits a Wayback Machine snapshot URL into its
-// (origin, snapshot) parts. snapshot is normalised to https and the
-// `if_` flag so the iframe-content view (no Wayback chrome) is fetched.
-// Returns ok=false if s isn't a Wayback snapshot URL.
-func ParseWaybackURL(s string) (origin, snapshot string, ok bool) {
-	s = strings.TrimSpace(s)
-	m := waybackURL.FindStringSubmatch(s)
-	if m == nil {
-		return "", "", false
-	}
-	ts, _, orig := m[1], m[2], m[3]
-	return orig, "https://web.archive.org/web/" + ts + "if_/" + orig, true
-}
 
 // FetchResult is the outcome of one source fetch. ArchiveURL is set
 // whenever Wayback has a snapshot, even on origin success.
@@ -191,7 +173,7 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string) (string, err
 	// Rewrite to the iframe-content view so we get the original page
 	// HTML instead of the Wayback wrapper (which would set the
 	// extracted title to "Wayback Machine").
-	if _, ifSnap, ok := ParseWaybackURL(snap); ok {
+	if _, ifSnap, ok := postmortems.ParseWaybackURL(snap); ok {
 		snap = ifSnap
 	}
 	f.cacheStore(target, snap)
