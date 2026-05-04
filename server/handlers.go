@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,12 +28,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// canonicalBaseURL is the production origin used to build canonical
-// links and Open Graph URLs regardless of which host actually served
-// the request. Embed/SEO bots compare these to decide which URL is
-// authoritative, so they must point at the public site even when the
-// app is reached over an internal hostname or http://localhost in dev.
-const canonicalBaseURL = "https://postmortems.app"
+// canonicalBase is the production origin used to build canonical
+// links and Open Graph URLs regardless of which host served the
+// request.
+var canonicalBase = url.URL{Scheme: "https", Host: "postmortems.app"}
 
 // siteTagline is the default <meta name="description"> / og:description
 // shown when a page does not provide its own. It mirrors the wording on
@@ -195,7 +194,7 @@ func secureOptions() secure.Options {
 		"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 		"img-src 'self' data:",
 		"font-src 'self' data: https://cdn.jsdelivr.net",
-		"connect-src 'self' " + reportdHost + " https://cdn.jsdelivr.net",
+		"connect-src 'self' " + reportdHost,
 		"object-src 'none'",
 		"base-uri 'self'",
 		"frame-ancestors 'none'",
@@ -281,17 +280,12 @@ var templateFuncs = template.FuncMap{
 	"absURL":        absURL,
 }
 
-// absURL turns a path-only string ("/", "/about", "/postmortem/UUID")
-// into a fully-qualified URL rooted at canonicalBaseURL. Empty or
-// relative inputs are normalised to a leading "/".
-func absURL(path string) string {
-	if path == "" {
-		path = "/"
+// absURL resolves a site-relative path against canonicalBase.
+func absURL(p string) string {
+	if p == "" {
+		p = "/"
 	}
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	return canonicalBaseURL + path
+	return canonicalBase.JoinPath(p).String()
 }
 
 // markdownLinkRE matches a basic Markdown inline link `[text](url)`.
@@ -426,16 +420,17 @@ func staticOrNotFound(dir string) http.Handler {
 	})
 }
 
-func getPosmortemByCategory(pms []*postmortems.Postmortem, category string) []postmortems.Postmortem {
-	ctpm := []postmortems.Postmortem{}
+func getPostmortemsByCategory(pms []*postmortems.Postmortem, category string) []postmortems.Postmortem {
+	out := []postmortems.Postmortem{}
 	for _, pm := range pms {
 		for _, c := range pm.Categories {
 			if c == category {
-				ctpm = append(ctpm, *pm)
+				out = append(out, *pm)
+				break
 			}
 		}
 	}
-	return ctpm
+	return out
 }
 
 // CompanySlug turns a company name into a URL-safe slug used by the
@@ -750,7 +745,7 @@ func categoryPageHandler(dir string) http.HandlerFunc {
 			return
 		}
 
-		matches := getPosmortemByCategory(pms, ct)
+		matches := getPostmortemsByCategory(pms, ct)
 		sortPostmortems(matches)
 
 		companyCounts := map[string]int{}

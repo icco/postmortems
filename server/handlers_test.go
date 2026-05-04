@@ -375,7 +375,7 @@ func TestSummarizeMarkdown(t *testing.T) {
 	}
 }
 
-func TestGetPosmortemByCategory(t *testing.T) {
+func TestGetPostmortemsByCategory(t *testing.T) {
 	tests := []struct {
 		name     string
 		category string
@@ -445,9 +445,9 @@ func TestGetPosmortemByCategory(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := getPosmortemByCategory(tc.pms, tc.category)
+			got := getPostmortemsByCategory(tc.pms, tc.category)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
-				t.Errorf("getPostmortemByCategory() returned unexpected results (-got +want):\n%s", diff)
+				t.Errorf("getPostmortemsByCategory() returned unexpected results (-got +want):\n%s", diff)
 			}
 		})
 	}
