@@ -5,10 +5,9 @@ categories:
 - postmortem
 company: Heroku
 product: ""
-source_fetched_at: 2026-05-04T18:06:24.286565Z
-summary: Having a system that requires scheduled manual updates resulted in an error which caused US customers to be unable to scale, stop or restart dynos, or route HTTP traffic, and also prevented all customers from being able to deploy.
+source_fetched_at: 2026-05-04T18:46:03.123278Z
 
 ---
 
-The provided article text is too short to generate a meaningful description of the incident. It only contains the title "Heroku Status Status". No details regarding the timeline, what failed, root cause, customer impact, or remediation are available in the given text.
+Having a system that requires scheduled manual updates resulted in an error which caused US customers to be unable to scale, stop or restart dynos, or route HTTP traffic, and also prevented all customers from being able to deploy.
 

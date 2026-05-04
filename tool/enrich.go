@@ -76,6 +76,16 @@ var junkDescriptionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\b(captcha|cloudflare challenge|browser verification)\b`),
 }
 
+// appendUnique appends s to xs if it's not already present.
+func appendUnique(xs []string, s string) []string {
+	for _, x := range xs {
+		if x == s {
+			return xs
+		}
+	}
+	return append(xs, s)
+}
+
 // looksLikeJunkDescription reports whether s reads like an "LLM had no
 // useful source" disclaimer rather than an actual incident write-up.
 func looksLikeJunkDescription(s string) bool {
@@ -223,11 +233,14 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		return res
 	}
 
-	// Pre-fetch normalisation: if the source URL itself is a Wayback
-	// snapshot, swap it for the origin and stash the snapshot in
-	// archive_url. This must persist even when the subsequent fetch
-	// fails so the file no longer points at the wrapper page.
+	// Pre-fetch normalisation. These edits must persist even if the
+	// subsequent fetch or LLM call fails so the file isn't left in a
+	// known-bad state.
 	var preChanged []string
+
+	// If the source URL itself is a Wayback snapshot, swap it for the
+	// origin and stash the snapshot in archive_url so the file no
+	// longer points at the wrapper page.
 	if origin, snapshot, ok := ParseWaybackURL(pm.URL); ok {
 		pm.URL = origin
 		preChanged = append(preChanged, "url")
@@ -236,6 +249,15 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 			preChanged = append(preChanged, "archive_url")
 		}
 		res.URL = origin
+	}
+
+	// Revert any existing junk LLM description (an "I had nothing to
+	// work with" placeholder from an earlier enrich pass). The
+	// original blurb was preserved in summary, so we restore it.
+	if looksLikeJunkDescription(pm.Description) && strings.TrimSpace(pm.Summary) != "" {
+		pm.Description = pm.Summary + "\n"
+		pm.Summary = ""
+		preChanged = append(preChanged, "description", "summary")
 	}
 
 	fr, err := fetcher.Fetch(ctx, pm.URL)
@@ -294,9 +316,16 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 
 	// If the LLM still can't produce a real description, treat the
 	// whole structured response as empty so we don't pollute fields
-	// with "the article text is..." placeholders.
+	// with "the article text is..." placeholders. We also drop the
+	// page metadata (title, dates) and wipe any existing pm.Title
+	// that originated from the same useless page.
 	if looksLikeJunkDescription(llmOut.ExpandedDescription) {
+		if pm.Title != "" && (pm.Title == page.Title || isBadTitle(pm.Title)) {
+			pm.Title = ""
+			preChanged = appendUnique(preChanged, "title")
+		}
 		llmOut = EnrichOutput{Confidence: llmOut.Confidence, Notes: llmOut.Notes}
+		page = PageMetadata{}
 	}
 
 	changed := mergeEnrichment(pm, fr, page, llmOut, opts)
