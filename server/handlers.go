@@ -18,6 +18,7 @@ import (
 	"github.com/icco/gutil/logging"
 	"github.com/icco/postmortems"
 	"github.com/russross/blackfriday/v2"
+	"github.com/unrolled/secure"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.uber.org/zap"
@@ -77,7 +78,8 @@ func New(opts Options) http.Handler {
 	r := chi.NewRouter()
 	r.Use(logging.Middleware(opts.Logger.Desugar()))
 	r.Use(routeTag)
-	r.Use(securityHeaders)
+	r.Use(reportingHeaders)
+	r.Use(secure.New(secureOptions()).Handler)
 
 	compressor := middleware.NewCompressor(flate.DefaultCompression)
 	r.Use(compressor.Handler)
@@ -122,19 +124,43 @@ func routeTag(next http.Handler) http.Handler {
 	})
 }
 
-// securityHeaders attaches Reporting-API + CSP headers to every
-// response. Browser violations land at reportd.natwelch.com (via the
-// `default` reporting group); Web Vitals are pushed by the inline
-// snippet in templates/layout.html.
-//
-// The CSP is intentionally permissive (allows the Tailwind/daisyUI
-// CDN, the unpkg-hosted web-vitals module, and inline scripts) so the
-// existing pages keep working. Tighten by enumerating hashes/nonces if
-// the inline scripts ever stabilise.
-func securityHeaders(next http.Handler) http.Handler {
-	reportEndpoint := reportdHost + "/report/" + reportdService
-	reportingEndpoint := reportdHost + "/reporting/" + reportdService
+// reportEndpoint is the legacy Report-To URL.
+func reportEndpoint() string { return reportdHost + "/report/" + reportdService }
 
+// reportingEndpoint is the modern Reporting-API URL referenced by
+// `Reporting-Endpoints: default=...`.
+func reportingEndpoint() string { return reportdHost + "/reporting/" + reportdService }
+
+// reportingHeaders attaches the Reporting-API routing headers to
+// every response so browser-emitted CSP / Reporting-API / COOP / COEP
+// / permissions-policy violations land in reportd.natwelch.com.
+//
+// Mirrors the matching chi middleware in icco/reportd and
+// icco/inspiration so all of natwelch's services land their reports
+// the same way. `Content-Security-Policy` itself is set by
+// unrolled/secure (see secureOptions); this middleware only carries
+// the report-routing headers it doesn't model.
+func reportingHeaders(next http.Handler) http.Handler {
+	reportTo := `{"group":"default","max_age":10886400,"endpoints":[{"url":"` + reportEndpoint() + `"}]}`
+	reportingEndpoints := `default="` + reportingEndpoint() + `"`
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Report-To", reportTo)
+		h.Set("Reporting-Endpoints", reportingEndpoints)
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// secureOptions returns the unrolled/secure config used by the New()
+// router. The defaults follow the icco/reportd setup with one
+// addition: a CSP that opens the Tailwind 4 / daisyUI 5 CDN and the
+// unpkg-hosted web-vitals module, both of which the redesigned
+// templates/layout.html pulls in. CSP violations are reported to the
+// same reportd endpoint via `report-uri` (legacy) and `report-to
+// default` (modern), so they show up alongside everything else.
+func secureOptions() secure.Options {
 	csp := strings.Join([]string{
 		"default-src 'self'",
 		"script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
@@ -145,31 +171,29 @@ func securityHeaders(next http.Handler) http.Handler {
 		"object-src 'none'",
 		"base-uri 'self'",
 		"frame-ancestors 'none'",
-		"report-uri " + reportEndpoint,
+		"report-uri " + reportEndpoint(),
 		"report-to default",
 	}, "; ")
 
-	reportTo := `{"group":"default","max_age":10886400,"endpoints":[{"url":"` + reportEndpoint + `"}]}`
-	reportingEndpoints := `default="` + reportingEndpoint + `"`
+	return secure.Options{
+		// Cloud Run terminates TLS for us; trust the proxy so HSTS
+		// applies on the edge but we don't 301-loop ourselves
+		// locally.
+		SSLRedirect:          false,
+		SSLProxyHeaders:      map[string]string{"X-Forwarded-Proto": "https"},
+		STSSeconds:           63072000, // two years
+		STSIncludeSubdomains: true,
+		STSPreload:           true,
+		ForceSTSHeader:       false,
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip the runtime/operational endpoints; they're not
-		// rendered in a browser and shouldn't pay the header tax.
-		switch r.URL.Path {
-		case "/healthz", "/metrics":
-			next.ServeHTTP(w, r)
-			return
-		}
+		FrameDeny:          true,
+		ContentTypeNosniff: true,
+		BrowserXssFilter:   true,
+		ReferrerPolicy:     "strict-origin-when-cross-origin",
+		PermissionsPolicy:  "geolocation=(), midi=(), sync-xhr=(), microphone=(), camera=(), magnetometer=(), gyroscope=(), fullscreen=(), payment=(), usb=()",
 
-		h := w.Header()
-		h.Set("Content-Security-Policy", csp)
-		h.Set("Reporting-Endpoints", reportingEndpoints)
-		h.Set("Report-To", reportTo)
-		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		h.Set("X-Content-Type-Options", "nosniff")
-
-		next.ServeHTTP(w, r)
-	})
+		ContentSecurityPolicy: csp,
+	}
 }
 
 func healthzHandler(w http.ResponseWriter, r *http.Request) {

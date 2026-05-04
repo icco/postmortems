@@ -8,30 +8,19 @@ data, and room for in-depth analysis.
 
 JSON metadata for every entry is published at <https://postmortems.app/output/>.
 
-## Frontend
+## Frontend conventions
 
-The site is a small Go webserver (`./tool -action=serve`) that
-renders `html/template` files under `templates/`. The visual layer is
-[Tailwind CSS 4](https://tailwindcss.com) + [daisyUI 5](https://daisyui.com)
-loaded from `cdn.jsdelivr.net` (no Node build step), with a small
-`static/styles.css` for the bits Tailwind/daisyUI don't cover (long-form
-prose, the GitHub-corner ribbon, sortable-table affordances). See
-`templates/layout.html` for the wiring.
-
-### Reporting & Web Vitals
-
-Browser security reports (CSP, COOP/COEP, Reporting-API, etc.) and
-[`web-vitals`](https://github.com/GoogleChrome/web-vitals) are sent to
-[`reportd.natwelch.com`](https://reportd.natwelch.com)
-([icco/reportd](https://github.com/icco/reportd)) under the `postmortems`
-service slug. The relevant pieces:
-
-- `securityHeaders` middleware in `server/handlers.go` emits
-  `Reporting-Endpoints`, `Report-To`, and a `Content-Security-Policy`
-  whose `report-uri` / `report-to default` reference reportd.
-- `templates/layout.html` posts Web Vitals (`CLS`, `FCP`, `INP`, `LCP`,
-  `TTFB`) via `navigator.sendBeacon` (with a `fetch` fallback) to
-  `https://reportd.natwelch.com/analytics/postmortems`.
+- Tailwind CSS 4 + daisyUI 5 are loaded from `cdn.jsdelivr.net` on
+  purpose &mdash; we run no Node build step. `static/styles.css` is for
+  the rare cases the CDN can't cover (e.g. blackfriday-rendered prose).
+- Browser reports and Web Vitals are sent to
+  [`reportd.natwelch.com`](https://github.com/icco/reportd) under the
+  service slug `postmortems`. Don't reintroduce a third-party analytics
+  snippet; if you need new metrics, send them through reportd.
+- Security/reporting headers use
+  [`unrolled/secure`](https://github.com/unrolled/secure) configured to
+  match `icco/reportd` and `icco/inspiration`. Mirror those repos when
+  changing the policy so all of natwelch's services stay in sync.
 
 ## Tool
 
