@@ -354,3 +354,16 @@ ul {
         font-size: 2rem;
     }
 }
+
+.sortable-th {
+    user-select: none;
+}
+
+.sortable-th:hover {
+    background-color: #f6f6f6;
+}
+
+.sort-arrow {
+    color: #666;
+    font-size: .75rem;
+}
