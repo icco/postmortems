@@ -3,7 +3,7 @@
 {{define "body"}}
 <article class="pa3 pa5-ns mw8 center">
   {{ range .Postmortems }}
-  <h1 class="f3 f2-m f1-l">{{ .Company }}</h1>
+  <h1 class="f3 f2-m f1-l"><a href="/company/{{ companySlug .Company }}">{{ .Company }}</a></h1>
   <ul>
     {{ range .Categories }}
     <li><a href="/category/{{ . }}">{{ . }}</a></li>

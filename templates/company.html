@@ -1,21 +1,26 @@
-{{define "title"}}Category {{ .Category }}{{end}}
+{{define "title"}}{{ .Company }} postmortems{{end}}
 
 {{define "body"}}
 <div class="pa4">
   <div class="overflow-auto">
-    <h1 class="f3 f2-m f1-l mw8 center">{{ .Category }}</h1>
+    <h1 class="f3 f2-m f1-l mw8 center">{{ .Company }}</h1>
+    <p class="lh-copy mw8 center">Postmortems associated with <strong>{{ .Company }}</strong>.</p>
     <table class="f6 w-100 mw8 center" cellspacing="0">
       <thead>
         <tr>
           <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">UUID</th>
-          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">Company</th>
+          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">Category</th>
         </tr>
       </thead>
       <tbody class="lh-copy">
         {{ range .Postmortems }}
         <tr>
           <td class="pv3 pr3 bb b--black-20"><a href="/postmortem/{{ .UUID }}">{{ .UUID }}</a></td>
-          <td class="pv3 pr3 bb b--black-20"><a href="/company/{{ companySlug .Company }}">{{ .Company }}</a></td>
+          <td class="pv3 pr3 bb b--black-20">
+            {{ range .Categories }}
+            <a href="/category/{{ . }}">{{ . }}</a>
+            {{end}}
+          </td>
         </tr>
         {{end}}
       </tbody>
