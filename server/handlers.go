@@ -76,8 +76,9 @@ func New(opts Options) http.Handler {
 		r.Method(http.MethodGet, "/metrics", opts.MetricsHandler)
 	}
 
-	fs := http.FileServer(http.Dir("static"))
-	r.Handle("/*", fs)
+	r.NotFound(notFoundHandler)
+	r.MethodNotAllowed(notFoundHandler)
+	r.Handle("/*", staticOrNotFound("static"))
 
 	return otelhttp.NewHandler(r, serverName,
 		otelhttp.WithFilter(func(req *http.Request) bool {
@@ -155,7 +156,7 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data in
 
 	if _, err := os.Stat(fp); err != nil {
 		if os.IsNotExist(err) {
-			http.NotFound(w, r)
+			notFoundHandler(w, r)
 			return
 		}
 	}
@@ -171,6 +172,50 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data in
 		l.Errorw("template execute error", "view", view, zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
+}
+
+// notFoundHandler writes a styled HTML 404 page using the standard layout.
+// Falls back to plain text if the template fails to load so we always
+// emit some response.
+func notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	l := logging.FromContext(r.Context())
+	lp := filepath.Join("templates", "layout.html")
+	fp := filepath.Join("templates", "404.html")
+
+	tmpl, err := template.ParseFiles(lp, fp)
+	if err != nil {
+		l.Errorw("404 template parse error", zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+
+	page := struct {
+		Categories []string
+	}{
+		Categories: postmortems.Categories,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	if err := tmpl.ExecuteTemplate(w, "layout", page); err != nil {
+		l.Errorw("404 template execute error", zap.Error(err))
+	}
+}
+
+// staticOrNotFound serves files from dir, falling back to the styled HTML
+// 404 page when a file does not exist (instead of FileServer's plain text).
+func staticOrNotFound(dir string) http.Handler {
+	fs := http.FileServer(http.Dir(dir))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		clean := filepath.Clean("/" + r.URL.Path)
+		full := filepath.Join(dir, clean)
+		info, err := os.Stat(full)
+		if err != nil || info.IsDir() {
+			notFoundHandler(w, r)
+			return
+		}
+		fs.ServeHTTP(w, r)
+	})
 }
 
 func getPosmortemByCategory(pms []*postmortems.Postmortem, category string) []postmortems.Postmortem {
@@ -233,7 +278,7 @@ func postmortemPageHandler(dir string) http.HandlerFunc {
 		pm, err := LoadPostmortem(dir, pmID+".md")
 		if err != nil {
 			l.Warnw("load postmortem", "pmid", pmID, zap.Error(err))
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			notFoundHandler(w, r)
 			return
 		}
 
