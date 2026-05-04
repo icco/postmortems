@@ -205,6 +205,7 @@ const (
 	testCompany     = "CCP Games"
 	testCategory    = "postmortem"
 	testDescription = "A typo and a name conflict caused the installer to sometimes delete the *boot.ini* file on installation of an expansion for *EVE Online* - with [consequences.](https://www.youtube.com/watch?v=msXRFJ2ar_E)"
+	amazonCompany   = "Amazon"
 )
 
 func TestLoadPostmortem(t *testing.T) {
@@ -296,6 +297,84 @@ func TestLoadPostmortems(t *testing.T) {
 	}
 }
 
+func TestCompanySlug(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in, want string
+	}{
+		{"CCP Games", "ccp-games"},
+		{"Healthcare.gov", "healthcare-gov"},
+		{amazonCompany, "amazon"},
+		{"  weird   spaces  ", "weird-spaces"},
+		{"a/b/c", "a-b-c"},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		if got := CompanySlug(tc.in); got != tc.want {
+			t.Errorf("CompanySlug(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestCompanyPageHandler(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(cwd); err != nil {
+			t.Logf("chdir back: %v", err)
+		}
+	})
+	if err := os.Chdir(".."); err != nil {
+		t.Fatalf("chdir to repo root: %v", err)
+	}
+
+	h := New(Options{Logger: zap.NewNop().Sugar(), Dir: "testdata"})
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+
+	t.Run("known company returns matches", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/company/ccp-games") //nolint:noctx // test
+		if err != nil {
+			t.Fatalf("get: %v", err)
+		}
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Logf("close body: %v", err)
+			}
+		}()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if !strings.Contains(string(body), "CCP Games") {
+			t.Errorf("body missing CCP Games; got:\n%s", body)
+		}
+		if !strings.Contains(string(body), testUUID) {
+			t.Errorf("body missing UUID; got:\n%s", body)
+		}
+	})
+
+	t.Run("unknown company returns 404", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/company/does-not-exist") //nolint:noctx // test
+		if err != nil {
+			t.Fatalf("get: %v", err)
+		}
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Logf("close body: %v", err)
+			}
+		}()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", resp.StatusCode)
+		}
+	})
+}
+
 func TestGetPosmortemByCategory(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -317,7 +396,7 @@ func TestGetPosmortemByCategory(t *testing.T) {
 				&postmortems.Postmortem{
 					UUID:        "0ea35968-4578-408c-b4fd-8c6ccc3501b0",
 					URL:         "http://aws.amazon.com/message/4372T8/",
-					Company:     "Amazon",
+					Company:     amazonCompany,
 					Categories:  []string{"hardware"},
 					Description: "At 10:25pm PDT on June 4, loss of power at an AWS Sydney facility resulting from severe weather in that area lead to disruption to a significant number of instances in an Availability Zone. Due to the signature of the power loss, power  isolation breakers did not engage, resulting in backup energy reserves draining into the degraded power grid.",
 				},
@@ -346,7 +425,7 @@ func TestGetPosmortemByCategory(t *testing.T) {
 				&postmortems.Postmortem{
 					UUID:        "0ea35968-4578-408c-b4fd-8c6ccc3501b0",
 					URL:         "http://aws.amazon.com/message/4372T8/",
-					Company:     "Amazon",
+					Company:     amazonCompany,
 					Categories:  []string{"hardware"},
 					Description: "At 10:25pm PDT on June 4, loss of power at an AWS Sydney facility resulting from severe weather in that area lead to disruption to a significant number of instances in an Availability Zone. Due to the signature of the power loss, power  isolation breakers did not engage, resulting in backup energy reserves draining into the degraded power grid.",
 				},

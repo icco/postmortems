@@ -74,6 +74,7 @@ func New(opts Options) http.Handler {
 	r.Get("/postmortem/{id}", postmortemPageHandler(opts.Dir))
 	r.Get("/postmortem/{id}.json", postmortemJSONPageHandler)
 	r.Get("/category/{category}", categoryPageHandler(opts.Dir))
+	r.Get("/company/{company}", companyPageHandler(opts.Dir))
 	r.Get("/healthz", healthzHandler)
 
 	if opts.MetricsHandler != nil {
@@ -151,6 +152,12 @@ func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
 	return pms, nil
 }
 
+// templateFuncs are made available to every template parsed by
+// renderTemplate.
+var templateFuncs = template.FuncMap{
+	"companySlug": CompanySlug,
+}
+
 // renderTemplate parses layout.html + view and writes the response.
 // Uses html/template so {{ .Field }} interpolations are HTML-escaped.
 func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data interface{}) {
@@ -165,7 +172,7 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data in
 		}
 	}
 
-	tmpl, err := template.ParseFiles(lp, fp)
+	tmpl, err := template.New("layout.html").Funcs(templateFuncs).ParseFiles(lp, fp)
 	if err != nil {
 		l.Errorw("template parse error", "view", view, zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -232,6 +239,71 @@ func getPosmortemByCategory(pms []*postmortems.Postmortem, category string) []po
 		}
 	}
 	return ctpm
+}
+
+// CompanySlug turns a company name into a URL-safe slug used by the
+// /company/{slug} route. It is exported so templates and tests can
+// consume the same algorithm.
+func CompanySlug(c string) string {
+	var b strings.Builder
+	prevDash := false
+	for _, r := range strings.ToLower(c) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			prevDash = false
+		default:
+			if !prevDash && b.Len() > 0 {
+				b.WriteRune('-')
+				prevDash = true
+			}
+		}
+	}
+	return strings.TrimRight(b.String(), "-")
+}
+
+func getPostmortemsByCompanySlug(pms []*postmortems.Postmortem, slug string) []postmortems.Postmortem {
+	out := []postmortems.Postmortem{}
+	for _, pm := range pms {
+		if CompanySlug(pm.Company) == slug {
+			out = append(out, *pm)
+		}
+	}
+	return out
+}
+
+func companyPageHandler(dir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := logging.FromContext(r.Context())
+		slug := chi.URLParam(r, "company")
+
+		pms, err := LoadPostmortems(dir)
+		if err != nil {
+			l.Errorw("load postmortems", "company", slug, zap.Error(err))
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		matches := getPostmortemsByCompanySlug(pms, slug)
+		if len(matches) == 0 {
+			notFoundHandler(w, r)
+			return
+		}
+
+		page := struct {
+			Company     string
+			Slug        string
+			Categories  []string
+			Postmortems []postmortems.Postmortem
+		}{
+			Company:     matches[0].Company,
+			Slug:        slug,
+			Categories:  postmortems.Categories,
+			Postmortems: matches,
+		}
+
+		renderTemplate(w, r, "company.html", page)
+	}
 }
 
 func categoryPageHandler(dir string) http.HandlerFunc {

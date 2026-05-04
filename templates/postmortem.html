@@ -3,9 +3,9 @@
 {{define "body"}}
 <article class="pa3 pa5-ns mw8 center">
   {{ range .Postmortems }}
-  <h1 class="f3 f2-m f1-l">{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }}{{ end }}</h1>
+  <h1 class="f3 f2-m f1-l">{{ if .Title }}{{ .Title }}{{ else }}<a href="/company/{{ companySlug .Company }}">{{ .Company }}</a>{{ end }}</h1>
   {{ if .Title }}
-  <h2 class="f5 f4-l fw4 mt0">{{ .Company }}</h2>
+  <h2 class="f5 f4-l fw4 mt0"><a href="/company/{{ companySlug .Company }}">{{ .Company }}</a></h2>
   {{ end }}
   {{ if .EventDatePeriod }}
   <p class="lh-copy mt0"><strong>Event date:</strong> {{ .EventDatePeriod }}</p>

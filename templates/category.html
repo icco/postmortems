@@ -17,7 +17,7 @@
           <td class="pv3 pr3 bb b--black-20">
             <a href="/postmortem/{{ .UUID }}">{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }}{{ end }}</a>
           </td>
-          <td class="pv3 pr3 bb b--black-20">{{ .Company }}</td>
+          <td class="pv3 pr3 bb b--black-20"><a href="/company/{{ companySlug .Company }}">{{ .Company }}</a></td>
         </tr>
         {{end}}
       </tbody>
