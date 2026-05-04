@@ -31,12 +31,16 @@ var badTitlePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)^(403 forbidden|forbidden)$`),
 	regexp.MustCompile(`(?i)^(404|page not found|not found)$`),
 	regexp.MustCompile(`(?i)^untitled.*$`),
-	regexp.MustCompile(`(?i)^redirecting\.?\.?\.?$`),
+	regexp.MustCompile(`(?i)^redirect(ing)?(\.{0,3}|\x{2026})$`),
 	regexp.MustCompile(`(?i)^help center.*$`),
 	regexp.MustCompile(`(?i)^loading\.?\.?\.?$`),
 	regexp.MustCompile(`(?i)please wait.*verification`),
 	regexp.MustCompile(`(?i)^please wait.*$`),
 	regexp.MustCompile(`(?i)^updates? on the status of .*$`),
+	regexp.MustCompile(`(?i)^.{1,40} blog: .*$`),
+	regexp.MustCompile(`(?i)^.{1,40} tech blog$`),
+	regexp.MustCompile(`(?i)^.{1,40} blog$`),
+	regexp.MustCompile(`(?i)^[a-z0-9-]+\.(io|com|net|org|dev|tech|co)$`),
 }
 
 // isBadTitle reports whether s looks like generic page chrome rather
@@ -74,6 +78,35 @@ var junkDescriptionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bdomain is for sale\b`),
 	regexp.MustCompile(`(?i)\bredirecting\.?\.?\.?$`),
 	regexp.MustCompile(`(?i)\b(captcha|cloudflare challenge|browser verification)\b`),
+	regexp.MustCompile(`(?i)\barchive team\b.*\bvolunteers\b`),
+	regexp.MustCompile(`(?i)\bnot the (specific )?(post-?mortem|incident|outage)\b`),
+	regexp.MustCompile(`(?i)\bdetails (about|regarding) (a |the )?(timeline|incident|outage|root cause)\b`),
+	regexp.MustCompile(`(?i)\bis a (comprehensive )?product page\b`),
+	regexp.MustCompile(`(?i)\bmarketing and informational resource\b`),
+	regexp.MustCompile(`(?i)\bnot detailed in the provided\b`),
+	regexp.MustCompile(`(?i)\bis not (available|present|detailed) (from|in) the (provided|given|article)\b`),
+}
+
+// titleFromPage reports whether a stored title looks like it came from
+// the current page's <title> tag. We accept exact, case-insensitive,
+// substring, or "page title is a longer dressed-up version of the
+// stored title" matches because page extractors and CMSes often append
+// site suffixes like " | Acme" or strip them depending on the run.
+func titleFromPage(stored, page string) bool {
+	stored = strings.TrimSpace(stored)
+	page = strings.TrimSpace(page)
+	if stored == "" || page == "" {
+		return isBadTitle(stored)
+	}
+	if strings.EqualFold(stored, page) {
+		return true
+	}
+	storedLower := strings.ToLower(stored)
+	pageLower := strings.ToLower(page)
+	if strings.Contains(pageLower, storedLower) || strings.Contains(storedLower, pageLower) {
+		return true
+	}
+	return isBadTitle(stored)
 }
 
 // appendUnique appends s to xs if it's not already present.
@@ -253,11 +286,22 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 
 	// Revert any existing junk LLM description (an "I had nothing to
 	// work with" placeholder from an earlier enrich pass). The
-	// original blurb was preserved in summary, so we restore it.
+	// original blurb was preserved in summary, so we restore it. We
+	// also drop the title and keywords picked from that bad pass —
+	// they came from page chrome (status pages, blog indexes, archive
+	// landings) rather than the actual postmortem.
 	if looksLikeJunkDescription(pm.Description) && strings.TrimSpace(pm.Summary) != "" {
 		pm.Description = pm.Summary + "\n"
 		pm.Summary = ""
 		preChanged = append(preChanged, "description", "summary")
+		if pm.Title != "" {
+			pm.Title = ""
+			preChanged = appendUnique(preChanged, "title")
+		}
+		if len(pm.Keywords) > 0 {
+			pm.Keywords = nil
+			preChanged = appendUnique(preChanged, "keywords")
+		}
 	}
 
 	fr, err := fetcher.Fetch(ctx, pm.URL)
@@ -320,7 +364,11 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	// page metadata (title, dates) and wipe any existing pm.Title
 	// that originated from the same useless page.
 	if looksLikeJunkDescription(llmOut.ExpandedDescription) {
-		if pm.Title != "" && (pm.Title == page.Title || isBadTitle(pm.Title)) {
+		// The LLM judged the source useless, so any title scraped from
+		// the same page is presumed page chrome rather than a real
+		// incident title. Wipe pm.Title when it likely came from this
+		// source.
+		if pm.Title != "" && titleFromPage(pm.Title, page.Title) {
 			pm.Title = ""
 			preChanged = appendUnique(preChanged, "title")
 		}

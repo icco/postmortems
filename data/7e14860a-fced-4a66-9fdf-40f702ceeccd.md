@@ -5,9 +5,8 @@ categories:
 - postmortem
 company: Heroku
 product: ""
-source_fetched_at: 2026-05-04T18:46:03.123278Z
+source_fetched_at: 2026-05-04T19:07:44.11829Z
 
 ---
 
 Having a system that requires scheduled manual updates resulted in an error which caused US customers to be unable to scale, stop or restart dynos, or route HTTP traffic, and also prevented all customers from being able to deploy.
-

@@ -383,7 +383,7 @@ func TestIsBadTitle(t *testing.T) {
 		"Attention Required! | Cloudflare", "Access denied",
 		"404", "Page not found", "Untitled Document",
 		"PagerDuty Status Page", "Stripe Status Page",
-		"Redirecting...", "Redirecting",
+		"Redirecting...", "Redirecting", "Redirecting…", "Redirect",
 		"Help Center Closed", "Help Center",
 		"Loading...", "Loading",
 		"Reddit - Please wait for verification",
@@ -425,6 +425,10 @@ func TestLooksLikeJunkDescription(t *testing.T) {
 		"The provided article text is limited to Wayback Machine capture metadata.",
 		"Redirecting...",
 		"This is a Cloudflare challenge page; we cannot read the content.",
+		"The provided article is a comprehensive product page for Google Cloud Observability.",
+		"It serves as a marketing and informational resource for Google Cloud's observability suite.",
+		"The nature of the underlying failure is not detailed in the provided information.",
+		"Information regarding remediation steps is not available from the provided summary.",
 	}
 	for _, s := range junk {
 		if !looksLikeJunkDescription(s) {
