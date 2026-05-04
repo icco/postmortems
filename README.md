@@ -53,43 +53,32 @@ go run ./tool -action=import -no-enrich        # save new entries, skip the LLM 
 go run ./tool -action=import -source=./list.md # custom source (URL or file path)
 ```
 
-`import` is the one-shot way to keep the corpus in sync. It:
-
-1. Reads `-source` (default: the [danluu/post-mortems](https://github.com/danluu/post-mortems) README).
-2. Skips any entry whose URL canonicalises (Wayback unwrap, http/https, `www.`,
-   trailing slash, fragment) to one already on disk, so previously enriched
-   fields are never overwritten.
-3. Saves the rest as fresh `data/<uuid>.md` files.
-4. Runs `enrich` on just those new UUIDs (unless `-no-enrich` or no GCP
-   credentials, in which case it logs a warning and stops after step 3).
-
-The steady state is cheap: nothing changes upstream → the run does an
-HTTP fetch and exits. Set up a daily cron and forget it.
+Entries whose URL canonicalises (Wayback unwrap, http/https, `www.`,
+trailing slash, fragment) to one already on disk are skipped, so
+previously enriched fields are never overwritten. With nothing new
+upstream the run is one HTTP fetch and exits — safe to put on a cron.
+Without GCP credentials, `import` still saves new entries and just
+skips the enrich step with a warning.
 
 ### `enrich`
 
-For every `data/*.md`, `enrich` fetches the source URL (with Wayback
-fallback), extracts page metadata, applies regex-based category
-suggestions, and asks Vertex Gemini for incident times, product,
-keywords and an expanded description. The original one-liner is
-preserved in `summary:` so the long-form `description:` body can be
-rewritten without losing the editorial blurb.
-
 Needs `GOOGLE_APPLICATION_CREDENTIALS` and `GOOGLE_CLOUD_PROJECT` (or
 `-gcp-project`). Default model `gemini-2.5-flash` (~$0.10–$1 for the
-full corpus).
+full corpus). Per entry: fetch (Wayback fallback) → extract metadata →
+regex-based category suggestions → Vertex Gemini for incident
+times/product/keywords/expanded description. The original one-liner
+moves to `summary:` whenever the body is rewritten.
 
 ```sh
-go run ./tool -action=enrich                    # dry run
-go run ./tool -action=enrich -apply             # write changes
-go run ./tool -action=enrich -apply -force      # overwrite non-empty fields
-go run ./tool -action=enrich -apply -only=01494547
-go run ./tool -action=enrich -apply -only=01494547,019eb098    # multiple UUID prefixes
+go run ./tool -action=enrich                                # dry run
+go run ./tool -action=enrich -apply                         # write changes
+go run ./tool -action=enrich -apply -force                  # overwrite non-empty fields
+go run ./tool -action=enrich -apply -only=01494547,019eb098 # comma-separated UUID prefixes
 ```
 
 Other flags: `-keep-description`, `-max-age=720h`, `-gcp-location`,
-`-gemini-model`, `-enrich-workers`. After enriching, run
-`go run ./tool -action=generate` to refresh `output/*.json`.
+`-gemini-model`, `-enrich-workers`. Run `-action=generate` afterwards
+to refresh `output/*.json`.
 
 #### YAML schema
 
@@ -107,43 +96,29 @@ Other flags: `-keep-description`, `-max-age=720h`, `-gcp-location`,
 | `source_fetched_at` | enrich run | Used for `-max-age` freshness skipping. |
 | `description` (body) | LLM expansion | Falls back to `summary` if the LLM has nothing. |
 
-#### How enrich handles junk pages
+#### Junk-page handling
 
-A lot of the original sources are dead, paywalled, captcha-walled,
-status-page chrome, or rebrand-redirected to marketing pages. Several
-heuristics keep these from polluting the corpus:
+Many sources are dead, paywalled, captcha-walled, or rebrand-redirected
+to marketing pages. `enrich` defends the corpus by:
 
-1. **Wayback unwrap.** A `url:` that's already a Wayback snapshot is
-   rewritten to the origin URL with the snapshot moved to `archive_url:`.
-2. **Wayback retry.** When the live origin returns 200 but Gemini
-   reports the page is useless, `enrich` re-fetches the Wayback snapshot
-   and re-runs the LLM. The second result is only adopted when it
-   passes the junk check.
-3. **Junk-description detection.** Gemini emits stock disclaimers
-   ("the provided article text…", "is a marketing page", "in raw PDF
-   format", "domain is for sale", "captcha", etc.) when it has nothing
-   to work with. `looksLikeJunkDescription` matches these and we
-   discard the entire LLM result instead of writing it.
-4. **Bad-title detection.** `isBadTitle` rejects scraped titles like
-   `Heroku Status`, `PagerDuty Status Page`, `Wayback Machine`,
-   `Redirecting…`, `Help Center Closed`, `Loading`, `Please wait …
-   verification`, `Acme Tech Blog`, `Acme Blog: Stories, Tutorials,
-   Releases`, and bare domains like `skyliner.io`.
-5. **Stale-cleanup on re-run.** When a file already has a junk
-   description on disk (from an earlier pass), the body is reverted to
-   `summary` and the title/keywords from that pass are dropped before
-   the new fetch runs. The cleanups persist even if the new fetch
-   fails.
+- **Unwrapping Wayback snapshots** in `url:` to origin + `archive_url:`
+  so re-imports stay idempotent.
+- **Retrying via Wayback** when the live origin returns 200 but Gemini
+  emits one of the stock "I had nothing to work with" disclaimers
+  (`looksLikeJunkDescription`). The retry result is only adopted when
+  it passes the same check.
+- **Rejecting bad scraped titles** matching `isBadTitle` —
+  `Heroku Status`, `Wayback Machine`, `Help Center Closed`,
+  `Redirecting…`, bare domains like `skyliner.io`, etc.
+- **Cleaning junk on re-run.** A file that already has a junk body
+  reverts to `summary` and drops the title/keywords from that pass
+  before the new fetch runs; the cleanups persist even if the fetch
+  fails.
 
-#### What still needs a human
-
-- **Dead origin + no Wayback snapshot.** When both fail, the entry
-  keeps its original blurb in `description` and minimal frontmatter.
-- **Rebrand redirects** (`stackdriver.com` → Google Observability)
-  where the new page reads as a coherent product description, so the
-  junk-description regexes don't catch it. Hand-edit when you spot one.
-- **PDF sources.** Currently fetched as bytes and ignored by the HTML
-  extractor. Worth a follow-up to download and parse text.
+Things still needing a hand-edit: dead origin + no Wayback snapshot
+(blurb-only entries), rebrand redirects whose new page reads as a
+coherent product description, and PDF sources (currently fetched as
+bytes and ignored by the HTML extractor).
 
 ## Contributing
 

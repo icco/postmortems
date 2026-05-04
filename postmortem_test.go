@@ -108,7 +108,6 @@ Example body.
 	}
 }
 
-
 func TestEventDatePeriod(t *testing.T) {
 	t.Parallel()
 

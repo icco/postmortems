@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -536,6 +535,3 @@ func TestNewFetcher_DefaultTimeout(t *testing.T) {
 		t.Errorf("expected default timeout > 0")
 	}
 }
-
-// avoid unused-import nag if a refactor temporarily drops a usage.
-var _ = http.StatusOK
