@@ -17,7 +17,6 @@ type EnrichInput struct {
 	Company     string
 	Existing    *postmortems.Postmortem
 	PageTitle   string
-	PageAuthor  string
 	PageDate    time.Time
 	PageText    string
 	UsedArchive bool
@@ -182,9 +181,6 @@ func buildPrompt(in EnrichInput) string {
 	}
 	if !in.PageDate.IsZero() {
 		fmt.Fprintf(&sb, "- Page published date (publication, not incident): %s\n", in.PageDate.UTC().Format(time.RFC3339))
-	}
-	if in.PageAuthor != "" {
-		fmt.Fprintf(&sb, "- Page author: %s\n", in.PageAuthor)
 	}
 	if in.PageTitle != "" {
 		fmt.Fprintf(&sb, "- Page title: %s\n", in.PageTitle)

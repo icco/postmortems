@@ -16,7 +16,6 @@ keywords:
 - bug
 company: Medium
 product: Medium
-source_author: Marcin Wichary
 source_published_at: 2015-02-02T20:09:43.204Z
 source_fetched_at: 2026-05-04T17:53:38.972411Z
 summary: Polish users were unable to use their "Ś" key on Medium.

@@ -32,7 +32,6 @@ type Postmortem struct {
 	Keywords          []string  `yaml:"keywords,omitempty"`
 	Company           string    `yaml:"company"`
 	Product           string    `yaml:"product"`
-	SourceAuthor      string    `yaml:"source_author,omitempty"`
 	SourcePublishedAt time.Time `yaml:"source_published_at,omitempty"`
 	SourceFetchedAt   time.Time `yaml:"source_fetched_at,omitempty"`
 	Summary           string    `yaml:"summary,omitempty"`
@@ -173,10 +172,6 @@ func Parse(f io.Reader) (*Postmortem, error) {
 
 	if product, ok := fm["product"].(string); ok {
 		p.Product = product
-	}
-
-	if author, ok := fm["source_author"].(string); ok {
-		p.SourceAuthor = author
 	}
 
 	if summary, ok := fm["summary"].(string); ok {

@@ -12,16 +12,15 @@ import (
 // to the LLM. PlainText may be truncated.
 type PageMetadata struct {
 	Title       string
-	Author      string
 	PublishedAt time.Time
 	PlainText   string
 }
 
 const maxPlainTextChars = 20000
 
-// ExtractMetadata pulls title/author/published_at and visible text from
+// ExtractMetadata pulls title/published_at and visible text from
 // htmlBody. OpenGraph beats <meta> beats <title>; JSON-LD wins for
-// author/date. Returns partial results on parse error.
+// date. Returns partial results on parse error.
 func ExtractMetadata(htmlBody string) PageMetadata {
 	out := PageMetadata{}
 	if strings.TrimSpace(htmlBody) == "" {
@@ -38,7 +37,6 @@ func ExtractMetadata(htmlBody string) PageMetadata {
 		title       string
 		ogTitle     string
 		twTitle     string
-		author      string
 		publishedAt time.Time
 	)
 
@@ -50,14 +48,14 @@ func ExtractMetadata(htmlBody string) PageMetadata {
 		switch {
 		case n.Type == html.ElementNode && (n.Data == "script" || n.Data == "style" || n.Data == "noscript" || n.Data == "template"):
 			if n.Data == "script" && attr(n, "type") == "application/ld+json" {
-				absorbJSONLD(n, &author, &publishedAt)
+				absorbJSONLD(n, &publishedAt)
 			}
 			skipDepth++
 			defer func() { skipDepth-- }()
 		case n.Type == html.ElementNode && n.Data == "title" && title == "":
 			title = strings.TrimSpace(textOf(n))
 		case n.Type == html.ElementNode && n.Data == "meta":
-			absorbMeta(n, &ogTitle, &twTitle, &author, &publishedAt)
+			absorbMeta(n, &ogTitle, &twTitle, &publishedAt)
 		case n.Type == html.ElementNode && n.Data == "time" && publishedAt.IsZero():
 			if dt := attr(n, "datetime"); dt != "" {
 				if t, ok := tryParseTime(dt); ok {
@@ -88,7 +86,6 @@ func ExtractMetadata(htmlBody string) PageMetadata {
 	default:
 		out.Title = title
 	}
-	out.Author = author
 	out.PublishedAt = publishedAt
 	out.PlainText = truncate(collapseWhitespace(text.String()), maxPlainTextChars)
 	return out
@@ -96,7 +93,7 @@ func ExtractMetadata(htmlBody string) PageMetadata {
 
 // absorbMeta updates running best values from a single <meta> tag.
 // Higher-quality sources (og:title > twitter:title > <title>) win.
-func absorbMeta(n *html.Node, ogTitle, twTitle, author *string, publishedAt *time.Time) {
+func absorbMeta(n *html.Node, ogTitle, twTitle *string, publishedAt *time.Time) {
 	property := strings.ToLower(attr(n, "property"))
 	name := strings.ToLower(attr(n, "name"))
 	content := strings.TrimSpace(attr(n, "content"))
@@ -108,8 +105,6 @@ func absorbMeta(n *html.Node, ogTitle, twTitle, author *string, publishedAt *tim
 		*ogTitle = content
 	case (name == "twitter:title" || property == "twitter:title") && *twTitle == "":
 		*twTitle = content
-	case (name == "author" || property == "article:author" || property == "book:author") && *author == "":
-		*author = content
 	case (property == "article:published_time" || name == "article:published_time" ||
 		property == "datepublished" || name == "datepublished" ||
 		name == "pubdate" || name == "publish-date" || name == "date") && publishedAt.IsZero():
@@ -119,9 +114,9 @@ func absorbMeta(n *html.Node, ogTitle, twTitle, author *string, publishedAt *tim
 	}
 }
 
-// absorbJSONLD scans a JSON-LD block for schema.org datePublished /
-// author. Most CMSes emit this and it beats meta tags.
-func absorbJSONLD(n *html.Node, author *string, publishedAt *time.Time) {
+// absorbJSONLD scans a JSON-LD block for schema.org datePublished. Most
+// CMSes emit this and it beats meta tags.
+func absorbJSONLD(n *html.Node, publishedAt *time.Time) {
 	raw := strings.TrimSpace(textOf(n))
 	if raw == "" {
 		return
@@ -130,12 +125,12 @@ func absorbJSONLD(n *html.Node, author *string, publishedAt *time.Time) {
 	if err := json.Unmarshal([]byte(raw), &any); err != nil {
 		return
 	}
-	walkJSONLD(any, author, publishedAt)
+	walkJSONLD(any, publishedAt)
 }
 
 // walkJSONLD recurses through JSON-LD (object, list, or @graph) and
-// fills author/publishedAt on first hit.
-func walkJSONLD(v interface{}, author *string, publishedAt *time.Time) {
+// fills publishedAt on first hit.
+func walkJSONLD(v interface{}, publishedAt *time.Time) {
 	switch x := v.(type) {
 	case map[string]interface{}:
 		if publishedAt.IsZero() {
@@ -145,35 +140,12 @@ func walkJSONLD(v interface{}, author *string, publishedAt *time.Time) {
 				}
 			}
 		}
-		if *author == "" {
-			switch a := x["author"].(type) {
-			case string:
-				*author = a
-			case map[string]interface{}:
-				if name, ok := a["name"].(string); ok {
-					*author = name
-				}
-			case []interface{}:
-				for _, item := range a {
-					if m, ok := item.(map[string]interface{}); ok {
-						if name, ok := m["name"].(string); ok {
-							*author = name
-							break
-						}
-					}
-					if s, ok := item.(string); ok {
-						*author = s
-						break
-					}
-				}
-			}
-		}
 		if g, ok := x["@graph"]; ok {
-			walkJSONLD(g, author, publishedAt)
+			walkJSONLD(g, publishedAt)
 		}
 	case []interface{}:
 		for _, item := range x {
-			walkJSONLD(item, author, publishedAt)
+			walkJSONLD(item, publishedAt)
 		}
 	}
 }

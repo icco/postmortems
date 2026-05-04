@@ -12,7 +12,6 @@ func TestExtractMetadata_OpenGraph(t *testing.T) {
 <html><head>
 <title>Boring fallback</title>
 <meta property="og:title" content="AWS S3 outage of February 2017">
-<meta name="author" content="AWS Team">
 <meta property="article:published_time" content="2017-03-01T12:00:00Z">
 </head><body>
 <p>Some text about <strong>S3</strong> failing.</p>
@@ -22,9 +21,6 @@ func TestExtractMetadata_OpenGraph(t *testing.T) {
 	got := ExtractMetadata(body)
 	if got.Title != "AWS S3 outage of February 2017" {
 		t.Errorf("Title = %q, want OpenGraph title", got.Title)
-	}
-	if got.Author != "AWS Team" {
-		t.Errorf("Author = %q, want %q", got.Author, "AWS Team")
 	}
 	want := time.Date(2017, 3, 1, 12, 0, 0, 0, time.UTC)
 	if !got.PublishedAt.Equal(want) {
@@ -43,15 +39,12 @@ func TestExtractMetadata_JSONLDFallback(t *testing.T) {
 	body := `<!doctype html><html><head>
 <title>Plain title</title>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BlogPosting","headline":"Outage post-mortem","datePublished":"2020-08-15T08:30:00Z","author":{"@type":"Person","name":"Jane Doe"}}
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"Outage post-mortem","datePublished":"2020-08-15T08:30:00Z"}
 </script>
 </head><body><p>Body text.</p></body></html>`
 	got := ExtractMetadata(body)
 	if got.Title != "Plain title" {
 		t.Errorf("Title = %q, want plain <title>", got.Title)
-	}
-	if got.Author != "Jane Doe" {
-		t.Errorf("Author = %q, want JSON-LD author", got.Author)
 	}
 	want := time.Date(2020, 8, 15, 8, 30, 0, 0, time.UTC)
 	if !got.PublishedAt.Equal(want) {
@@ -73,7 +66,7 @@ func TestExtractMetadata_TimeElement(t *testing.T) {
 func TestExtractMetadata_Empty(t *testing.T) {
 	t.Parallel()
 	got := ExtractMetadata("")
-	if got.Title != "" || got.Author != "" || !got.PublishedAt.IsZero() || got.PlainText != "" {
+	if got.Title != "" || !got.PublishedAt.IsZero() || got.PlainText != "" {
 		t.Errorf("expected zero-value PageMetadata, got %+v", got)
 	}
 }

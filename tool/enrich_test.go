@@ -30,7 +30,6 @@ func (f *fakeLLM) Close() error { return nil }
 const sampleHTML = `<!doctype html><html><head>
 <title>Backend Down: Postmortem</title>
 <meta property="og:title" content="Backend Down: Postmortem">
-<meta name="author" content="On-Call Team">
 <meta property="article:published_time" content="2017-03-01T00:00:00Z">
 </head><body>
 <p>Our service was down between 17:37 and 19:01 UTC on Feb 28, 2017.</p>
@@ -118,9 +117,6 @@ func TestEnrich_FillsBlanksAndPreservesSummary(t *testing.T) {
 	}
 	if pm.Product != "Backend API" {
 		t.Errorf("Product = %q", pm.Product)
-	}
-	if pm.SourceAuthor != "On-Call Team" {
-		t.Errorf("SourceAuthor = %q", pm.SourceAuthor)
 	}
 	if pm.SourcePublishedAt.IsZero() {
 		t.Errorf("SourcePublishedAt is zero")
@@ -325,6 +321,67 @@ Body for ` + id + `.
 	}
 	if !strings.HasPrefix(filepath.Base(res[0].Path), "aaaaaaaa") {
 		t.Errorf("filtered to wrong file: %s", res[0].Path)
+	}
+}
+
+func TestIsBadTitle(t *testing.T) {
+	t.Parallel()
+	bad := []string{
+		"", "  ", "Heroku Status", "AWS Status", "Cloudflare Status",
+		"Wayback Machine", "Internet Archive", "Just a moment...",
+		"Attention Required! | Cloudflare", "Access denied",
+		"404", "Page not found", "Untitled Document",
+	}
+	for _, s := range bad {
+		if !isBadTitle(s) {
+			t.Errorf("isBadTitle(%q) = false, want true", s)
+		}
+	}
+	good := []string{
+		"AWS S3 us-east-1 outage of February 2017",
+		"GitHub Pages downtime, Sept 2018",
+		"Status of GitLab during the great migration",
+		"How we recovered from a status page outage",
+	}
+	for _, s := range good {
+		if isBadTitle(s) {
+			t.Errorf("isBadTitle(%q) = true, want false", s)
+		}
+	}
+}
+
+func TestApplyTitle(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name             string
+		existing, llm, p string
+		force            bool
+		wantTitle        string
+		wantChanged      bool
+	}{
+		{"replace bad existing with good llm", "Heroku Status", "Heroku Postgres outage", "", false, "Heroku Postgres outage", true},
+		{"wipe bad existing when no replacement", "Heroku Status", "", "Wayback Machine", false, "", true},
+		{"keep good existing", "Real title", "LLM-suggested", "page-suggested", false, "Real title", false},
+		{"force overrides good existing", "Real title", "LLM-suggested", "", true, "LLM-suggested", true},
+		{"reject bad llm and bad page when existing empty", "", "Heroku Status", "Wayback Machine", false, "", false},
+		{"page fallback when llm bad", "", "Wayback Machine", "Real page title", false, "Real page title", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, changed := applyTitle(tc.existing, tc.llm, tc.p, tc.force, nil)
+			if got != tc.wantTitle {
+				t.Errorf("title = %q, want %q", got, tc.wantTitle)
+			}
+			gotChanged := false
+			for _, c := range changed {
+				if c == "title" {
+					gotChanged = true
+				}
+			}
+			if gotChanged != tc.wantChanged {
+				t.Errorf("changed=%v, want %v (changed list: %v)", gotChanged, tc.wantChanged, changed)
+			}
+		})
 	}
 }
 

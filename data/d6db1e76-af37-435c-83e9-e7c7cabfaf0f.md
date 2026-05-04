@@ -20,7 +20,6 @@ keywords:
 - sms
 company: Square
 product: Multipass
-source_author: https://medium.com/@SquareEng
 source_published_at: 2019-04-18T22:40:36.082Z
 source_fetched_at: 2026-05-04T17:53:56.418725Z
 summary: A cascading error from an adjacent service lead to merchant authentication service being overloaded. This impacted merchants for ~2 hours.

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -13,6 +14,36 @@ import (
 
 	"github.com/icco/postmortems"
 )
+
+// badTitlePatterns marks page-title scrapes that aren't actually
+// describing the postmortem (status-page chrome, archive wrappers,
+// captcha walls). These get treated as empty so the LLM/page-title
+// pipeline can replace them on the next enrich pass.
+var badTitlePatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)^(.{1,20}\s)?status$`),
+	regexp.MustCompile(`(?i)^wayback machine$`),
+	regexp.MustCompile(`(?i)^internet archive$`),
+	regexp.MustCompile(`(?i)^just a moment\.?\.?\.?$`),
+	regexp.MustCompile(`(?i)^attention required.*$`),
+	regexp.MustCompile(`(?i)^access denied$`),
+	regexp.MustCompile(`(?i)^(404|page not found|not found)$`),
+	regexp.MustCompile(`(?i)^untitled.*$`),
+}
+
+// isBadTitle reports whether s looks like generic page chrome rather
+// than a real incident title.
+func isBadTitle(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return true
+	}
+	for _, re := range badTitlePatterns {
+		if re.MatchString(s) {
+			return true
+		}
+	}
+	return false
+}
 
 // enrichOptions configures the enrich action.
 type enrichOptions struct {
@@ -160,7 +191,6 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		Company:     pm.Company,
 		Existing:    pm,
 		PageTitle:   page.Title,
-		PageAuthor:  page.Author,
 		PageDate:    page.PublishedAt,
 		PageText:    page.PlainText,
 		UsedArchive: fr.UsedArchive,
@@ -238,9 +268,8 @@ func mergeEnrichment(pm *postmortems.Postmortem, fr FetchResult, page PageMetada
 		changed = append(changed, "source_fetched_at")
 	}
 
-	pm.Title = set("title", pm.Title, firstNonEmpty(llm.Title, page.Title), opts.Force)
+	pm.Title, changed = applyTitle(pm.Title, llm.Title, page.Title, opts.Force, changed)
 	pm.Product = set("product", pm.Product, llm.Product, opts.Force)
-	pm.SourceAuthor = set("source_author", pm.SourceAuthor, page.Author, opts.Force)
 	pm.SourcePublishedAt = setTime("source_published_at", pm.SourcePublishedAt, page.PublishedAt, opts.Force)
 	pm.StartTime = setTime("start_time", pm.StartTime, llm.StartTime, opts.Force)
 	pm.EndTime = setTime("end_time", pm.EndTime, llm.EndTime, opts.Force)
@@ -300,6 +329,40 @@ func firstNonEmpty(s ...string) string {
 		}
 	}
 	return ""
+}
+
+// nonBad returns s unless it matches a known-bad title pattern.
+func nonBad(s string) string {
+	if isBadTitle(s) {
+		return ""
+	}
+	return s
+}
+
+// applyTitle picks the best title for pm given the llm/page candidates
+// and the -force flag, treating known-bad titles as empty so they get
+// replaced or wiped rather than persisted. Returns the new title and
+// the (possibly extended) changed list.
+func applyTitle(existing, llmTitle, pageTitle string, force bool, changed []string) (string, []string) {
+	existingBad := isBadTitle(existing)
+	next := firstNonEmpty(nonBad(llmTitle), nonBad(pageTitle))
+	switch {
+	case existingBad && next != "":
+		if existing != next {
+			changed = append(changed, "title")
+		}
+		return next, changed
+	case existingBad && next == "":
+		if existing != "" {
+			changed = append(changed, "title")
+		}
+		return "", changed
+	case !existingBad && next != "" && force && existing != next:
+		changed = append(changed, "title")
+		return next, changed
+	default:
+		return existing, changed
+	}
 }
 
 // errKind classifies an enrichResult error for counting/labelling.
