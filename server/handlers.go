@@ -9,9 +9,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -23,6 +26,31 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.uber.org/zap"
 )
+
+// canonicalBaseURL is the production origin used to build canonical
+// links and Open Graph URLs regardless of which host actually served
+// the request. Embed/SEO bots compare these to decide which URL is
+// authoritative, so they must point at the public site even when the
+// app is reached over an internal hostname or http://localhost in dev.
+const canonicalBaseURL = "https://postmortems.app"
+
+// siteTagline is the default <meta name="description"> / og:description
+// shown when a page does not provide its own. It mirrors the wording on
+// /about so embeds without a more specific blurb still describe what
+// the site is.
+const siteTagline = "A public repository of incident reports with annotated metadata and summaries of public postmortem documents."
+
+// PageMeta carries per-page SEO/social metadata. Every handler that
+// renders a template must populate one and stick it on its page struct
+// as `Meta` so layout.html can build correct canonical/og:url/og:title
+// /og:description tags. Path is path-only with a leading "/"; absURL
+// turns it into an absolute URL rooted at canonicalBaseURL.
+type PageMeta struct {
+	Path        string
+	Title       string
+	Description string
+	OGType      string // "website" (default) or "article"
+}
 
 // serverName is the otelhttp span/metric scope.
 const serverName = "postmortems"
@@ -167,7 +195,7 @@ func secureOptions() secure.Options {
 		"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 		"img-src 'self' data:",
 		"font-src 'self' data: https://cdn.jsdelivr.net",
-		"connect-src 'self' " + reportdHost,
+		"connect-src 'self' " + reportdHost + " https://cdn.jsdelivr.net",
 		"object-src 'none'",
 		"base-uri 'self'",
 		"frame-ancestors 'none'",
@@ -250,6 +278,71 @@ var templateFuncs = template.FuncMap{
 	"categoryEmoji": categoryEmoji,
 	"prettifyText":  prettifyText,
 	"firstNonEmpty": firstNonEmpty,
+	"absURL":        absURL,
+}
+
+// absURL turns a path-only string ("/", "/about", "/postmortem/UUID")
+// into a fully-qualified URL rooted at canonicalBaseURL. Empty or
+// relative inputs are normalised to a leading "/".
+func absURL(path string) string {
+	if path == "" {
+		path = "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return canonicalBaseURL + path
+}
+
+// markdownLinkRE matches a basic Markdown inline link `[text](url)`.
+// Used by plainText to keep the visible label and drop the URL when
+// building OG descriptions.
+var markdownLinkRE = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+
+// htmlTagRE matches HTML tags so plainText can also accept already-
+// rendered descriptions and produce a clean text fragment.
+var htmlTagRE = regexp.MustCompile(`<[^>]+>`)
+
+// plainText turns a fragment of Markdown (or rendered HTML) into a
+// single line of human-readable text suitable for an OG description:
+// links collapse to their label, emphasis/code/heading markers are
+// stripped, and runs of whitespace collapse to single spaces.
+func plainText(s string) string {
+	s = markdownLinkRE.ReplaceAllString(s, "$1")
+	s = htmlTagRE.ReplaceAllString(s, " ")
+	s = strings.NewReplacer("*", "", "_", "", "`", "", "#", "", ">", "").Replace(s)
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// truncateAtWord clips s to at most max runes on a word boundary,
+// appending an ellipsis when it had to cut. If the string is already
+// short enough it is returned unchanged.
+func truncateAtWord(s string, maxRunes int) string {
+	s = strings.TrimSpace(s)
+	if maxRunes <= 0 || utf8.RuneCountInString(s) <= maxRunes {
+		return s
+	}
+	runes := []rune(s)
+	cut := maxRunes
+	for cut > 0 && !unicode.IsSpace(runes[cut]) {
+		cut--
+	}
+	if cut == 0 {
+		// No whitespace within budget -- fall back to a hard cut so
+		// we still emit something rather than the whole string.
+		cut = maxRunes
+	}
+	return strings.TrimRight(string(runes[:cut]), " \t,.;:") + "\u2026"
+}
+
+// summarizeMarkdown produces an OG-friendly description from a
+// Markdown body: it strips the obvious syntax then truncates at a word
+// boundary. Empty in / empty out.
+func summarizeMarkdown(md string, maxRunes int) string {
+	if strings.TrimSpace(md) == "" {
+		return ""
+	}
+	return truncateAtWord(plainText(md), maxRunes)
 }
 
 // renderTemplate parses layout.html + view and writes the response.
@@ -295,8 +388,18 @@ func notFoundHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	page := struct {
+		Meta       PageMeta
 		Categories []string
 	}{
+		Meta: PageMeta{
+			// Path intentionally left empty: the 404 has no
+			// canonical URL of its own, so layout.html falls
+			// back to "/" which is harmless for crawlers.
+			Path:        "",
+			Title:       "404 \u2014 Not Found",
+			Description: "The page you were looking for could not be found.",
+			OGType:      "website",
+		},
 		Categories: postmortems.Categories,
 	}
 
@@ -586,7 +689,18 @@ func companyPageHandler(dir string) http.HandlerFunc {
 		}
 		dr := computeDateRange(matches)
 
+		company := matches[0].Company
+		var desc string
+		if dr.HasAny {
+			desc = fmt.Sprintf("%d %s from %s, spanning %s.",
+				len(matches), pluralize("postmortem", len(matches)), company, dr.String())
+		} else {
+			desc = fmt.Sprintf("%d %s from %s.",
+				len(matches), pluralize("postmortem", len(matches)), company)
+		}
+
 		page := struct {
+			Meta           PageMeta
 			Company        string
 			Slug           string
 			Categories     []string
@@ -596,7 +710,13 @@ func companyPageHandler(dir string) http.HandlerFunc {
 			SpanYears      int
 			Postmortems    []postmortems.Postmortem
 		}{
-			Company:        matches[0].Company,
+			Meta: PageMeta{
+				Path:        "/company/" + slug,
+				Title:       company + " postmortems",
+				Description: desc,
+				OGType:      "website",
+			},
+			Company:        company,
 			Slug:           slug,
 			Categories:     postmortems.Categories,
 			CategoryCounts: topLabeledCounts(categoryCounts, 0),
@@ -608,6 +728,14 @@ func companyPageHandler(dir string) http.HandlerFunc {
 
 		renderTemplate(w, r, "company.html", page)
 	}
+}
+
+// pluralize returns word with an "s" appended when n != 1.
+func pluralize(word string, n int) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
 }
 
 func categoryPageHandler(dir string) http.HandlerFunc {
@@ -645,6 +773,7 @@ func categoryPageHandler(dir string) http.HandlerFunc {
 		dr := computeDateRange(matches)
 
 		page := struct {
+			Meta           PageMeta
 			Category       string
 			Description    string
 			Emoji          string
@@ -657,6 +786,12 @@ func categoryPageHandler(dir string) http.HandlerFunc {
 			TotalCompanies int
 			Postmortems    []postmortems.Postmortem
 		}{
+			Meta: PageMeta{
+				Path:        "/category/" + ct,
+				Title:       prettifyText(ct) + " postmortems",
+				Description: describeCategory(ct),
+				OGType:      "website",
+			},
 			Category:       ct,
 			Description:    describeCategory(ct),
 			Emoji:          categoryEmoji(ct),
@@ -695,11 +830,18 @@ func aboutPageHandler(dir string) http.HandlerFunc {
 		}
 
 		page := struct {
+			Meta           PageMeta
 			Categories     []string
 			TotalCount     int
 			CompanyCount   int
 			CategoryCounts map[string]int
 		}{
+			Meta: PageMeta{
+				Path:        "/about",
+				Title:       "About postmortems.app",
+				Description: "A public, machine-readable corpus of post-incident reviews from companies across the industry, with categories, time data, and room for in-depth analysis.",
+				OGType:      "website",
+			},
 			Categories:     postmortems.Categories,
 			TotalCount:     len(pms),
 			CompanyCount:   len(companies),
@@ -726,13 +868,32 @@ func postmortemPageHandler(dir string) http.HandlerFunc {
 			return
 		}
 
-		// Render Markdown -> HTML, then wrap in template.HTML to skip double-escaping.
+		// Capture an OG-friendly description from the *un-rendered*
+		// Markdown body before blackfriday turns it into HTML --
+		// otherwise plainText would have to peel through paragraph
+		// wrappers etc. Prefer the curated Summary when set; some
+		// summaries also contain Markdown emphasis/links so we
+		// always strip syntax rather than relying on the curator
+		// having pre-cleaned them.
+		metaSource := pm.Summary
+		if metaSource == "" {
+			metaSource = pm.Description
+		}
+		metaDesc := summarizeMarkdown(metaSource, 200)
+
 		pm.Description = string(blackfriday.Run([]byte(pm.Description)))
 
 		page := struct {
+			Meta        PageMeta
 			Categories  []string
 			Postmortems []postmortemView
 		}{
+			Meta: PageMeta{
+				Path:        "/postmortem/" + pm.UUID,
+				Title:       firstNonEmpty(pm.Title, pm.Company+" postmortem"),
+				Description: metaDesc,
+				OGType:      "article",
+			},
 			Categories:  postmortems.Categories,
 			Postmortems: []postmortemView{toView(pm)},
 		}
@@ -776,9 +937,16 @@ func indexHandler(dir string) http.HandlerFunc {
 		}
 
 		page := struct {
+			Meta        PageMeta
 			Categories  []string
 			Postmortems []*postmortems.Postmortem
 		}{
+			Meta: PageMeta{
+				Path:        "/",
+				Title:       "Postmortem Index",
+				Description: siteTagline,
+				OGType:      "website",
+			},
 			Categories:  postmortems.Categories,
 			Postmortems: pms,
 		}
