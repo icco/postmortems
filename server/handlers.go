@@ -70,7 +70,7 @@ func New(opts Options) http.Handler {
 	r.Handle("/output/*", http.StripPrefix("/output/", http.FileServer(http.Dir("./output"))))
 
 	r.Get("/", indexHandler(opts.Dir))
-	r.Get("/about", aboutPageHandler)
+	r.Get("/about", aboutPageHandler(opts.Dir))
 	r.Get("/postmortem/{id}", postmortemPageHandler(opts.Dir))
 	r.Get("/postmortem/{id}.json", postmortemJSONPageHandler)
 	r.Get("/category/{category}", categoryPageHandler(opts.Dir))
@@ -332,13 +332,39 @@ func categoryPageHandler(dir string) http.HandlerFunc {
 	}
 }
 
-func aboutPageHandler(w http.ResponseWriter, r *http.Request) {
-	page := struct {
-		Categories []string
-	}{
-		Categories: postmortems.Categories,
+func aboutPageHandler(dir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := logging.FromContext(r.Context())
+
+		pms, err := LoadPostmortems(dir)
+		if err != nil {
+			l.Errorw("load postmortems", zap.Error(err))
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		companies := map[string]struct{}{}
+		categoryCounts := map[string]int{}
+		for _, pm := range pms {
+			companies[pm.Company] = struct{}{}
+			for _, c := range pm.Categories {
+				categoryCounts[c]++
+			}
+		}
+
+		page := struct {
+			Categories     []string
+			TotalCount     int
+			CompanyCount   int
+			CategoryCounts map[string]int
+		}{
+			Categories:     postmortems.Categories,
+			TotalCount:     len(pms),
+			CompanyCount:   len(companies),
+			CategoryCounts: categoryCounts,
+		}
+		renderTemplate(w, r, "about.html", page)
 	}
-	renderTemplate(w, r, "about.html", page)
 }
 
 func postmortemPageHandler(dir string) http.HandlerFunc {

@@ -21,5 +21,17 @@
     
     <p class="lh-copy">This website is brought to you by <a href="https://natwelch.com/">@icco</a>, <a href="https://dastergon.gr/">@dastergon</a>,
         and our merry band of <a href="https://github.com/icco/postmortems/graphs/contributors">contributors</a>!</p>
+
+    <h2 class="f3 f2-m f1-l">Stats</h2>
+    <dl class="lh-copy">
+        <dt class="fw6">Total postmortems</dt>
+        <dd class="ml0">{{ .TotalCount }}</dd>
+        <dt class="fw6">Unique companies</dt>
+        <dd class="ml0">{{ .CompanyCount }}</dd>
+        {{ range .Categories }}
+        <dt class="fw6">Category: {{ . }}</dt>
+        <dd class="ml0">{{ index $.CategoryCounts . }}</dd>
+        {{ end }}
+    </dl>
 </article>
 {{end}}
