@@ -16,8 +16,7 @@ renders `html/template` files under `templates/`. The visual layer is
 loaded from `cdn.jsdelivr.net` (no Node build step), with a small
 `static/styles.css` for the bits Tailwind/daisyUI don't cover (long-form
 prose, the GitHub-corner ribbon, sortable-table affordances). See
-`templates/layout.html` for the wiring; the migration tracking issue is
-[#107](https://github.com/icco/postmortems/issues/107).
+`templates/layout.html` for the wiring.
 
 ### Reporting & Web Vitals
 
@@ -25,8 +24,7 @@ Browser security reports (CSP, COOP/COEP, Reporting-API, etc.) and
 [`web-vitals`](https://github.com/GoogleChrome/web-vitals) are sent to
 [`reportd.natwelch.com`](https://reportd.natwelch.com)
 ([icco/reportd](https://github.com/icco/reportd)) under the `postmortems`
-service slug. The previous Fathom snippet pointing at `a.natwelch.com`
-was removed in the same change. The relevant pieces:
+service slug. The relevant pieces:
 
 - `securityHeaders` middleware in `server/handlers.go` emits
   `Reporting-Endpoints`, `Report-To`, and a `Content-Security-Policy`
