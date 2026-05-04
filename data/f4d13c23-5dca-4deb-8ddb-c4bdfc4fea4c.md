@@ -2,7 +2,9 @@
 uuid: f4d13c23-5dca-4deb-8ddb-c4bdfc4fea4c
 url: https://web.archive.org/web/20220427012208/https://lkml.org/lkml/2009/1/2/373
 categories:
+- cloud
 - postmortem
+- time
 company: Linux
 product: ""
 

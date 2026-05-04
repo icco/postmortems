@@ -23,7 +23,27 @@ generate    Generate JSON files from the postmortem Markdown files.
 new         Create a new postmortem file.
 validate    Validate the postmortem files in the directory.
 serve       Serve the postmortem files in a small website.
+categorize  Scrape each postmortem's source URL and suggest categories.
 ```
+
+### `categorize`
+
+The `categorize` action fetches each postmortem's source URL and greps
+the response body against a set of regular expressions per category
+(see `tool/categorize.go`). Without `-apply` it runs as a dry-run that
+prints suggestions to stdout. With `-apply` it merges the suggested
+categories back into each Markdown file.
+
+```sh
+# dry run
+go run ./tool -action=categorize
+
+# write suggestions back into ./data/*.md
+go run ./tool -action=categorize -apply
+```
+
+The tool is intentionally a one-shot helper: review the diff before
+committing. There is no automated PR-filing bot.
 
 ## Contributing
 

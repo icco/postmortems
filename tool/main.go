@@ -25,9 +25,12 @@ import (
 )
 
 var (
-	log    = logging.Must(logging.NewLogger(postmortems.Service))
-	action = flag.String("action", "", "")
-	dir    = flag.String("dir", "./data/", "")
+	log              = logging.Must(logging.NewLogger(postmortems.Service))
+	action           = flag.String("action", "", "")
+	dir              = flag.String("dir", "./data/", "")
+	categorizeApply  = flag.Bool("apply", false, "categorize: write suggested categories back into the markdown files (default: dry run)")
+	categorizeWorker = flag.Int("workers", 8, "categorize: number of concurrent HTTP fetchers")
+	categorizeTime   = flag.Duration("http-timeout", 15*time.Second, "categorize: per-URL fetch timeout")
 	qs     = []*survey.Question{
 		{
 			Name:     "url",
@@ -74,6 +77,8 @@ generate        Generate JSON files from the postmortem Markdown files.
 new             Create a new postmortem file.
 validate        Validate the postmortem files in the directory.
 serve           Serve the postmortem files in a small website.
+categorize      Scrape each postmortem URL and suggest additional categories.
+                Pass -apply to write suggestions back to the markdown files.
 `
 	danluuReadme = "https://raw.githubusercontent.com/danluu/post-mortems/master/README.md"
 	extractFile  = "./tmp/posts.md"
@@ -152,6 +157,17 @@ func main() {
 		err = newPostmortem(*dir)
 	case "validate":
 		_, err = postmortems.ValidateDir(*dir)
+	case "categorize":
+		var res []categorizeResult
+		res, err = CategorizePostmortems(categorizeOptions{
+			Dir:         *dir,
+			Apply:       *categorizeApply,
+			HTTPTimeout: *categorizeTime,
+			Concurrency: *categorizeWorker,
+		})
+		if err == nil {
+			printCategorizeReport(os.Stdout, res, *categorizeApply)
+		}
 	case "serve":
 		err = Serve()
 	default:
