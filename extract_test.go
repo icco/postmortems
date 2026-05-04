@@ -57,8 +57,18 @@ Long enriched body.
 		t.Fatalf("write upstream: %v", err)
 	}
 
-	if err := ExtractPostmortems(src, dir); err != nil {
+	report, err := ExtractPostmortems(src, dir)
+	if err != nil {
 		t.Fatalf("ExtractPostmortems: %v", err)
+	}
+	if got := len(report.Added); got != 1 {
+		t.Errorf("Added = %d, want 1", got)
+	}
+	if report.SkippedExisting != 1 {
+		t.Errorf("SkippedExisting = %d, want 1", report.SkippedExisting)
+	}
+	if report.SkippedInvalid != 1 {
+		t.Errorf("SkippedInvalid = %d, want 1 (the malformed combo line)", report.SkippedInvalid)
 	}
 
 	// Existing file: untouched.

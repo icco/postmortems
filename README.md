@@ -18,12 +18,10 @@ Options:
 -dir        The directory with Markdown files for to extract or parse. Defaults to ./data
 
 Actions:
-extract         Import new postmortems from a local collection file. Existing
-                entries (matched by canonical URL, including Wayback unwrap)
-                are left untouched.
-upstream-fetch  Same as extract but downloads the latest danluu/post-mortems
-                README. Use this to backfill missing entries; run `enrich`
-                afterwards to fill in metadata.
+import          Pull the latest entries from -source (default:
+                danluu/post-mortems README), additively save any new ones,
+                then enrich just those new entries via Gemini. Idempotent
+                and safe to run repeatedly.
 generate        Generate JSON files from the postmortem Markdown files.
 new             Create a new postmortem file.
 validate        Validate the postmortem files in the directory.
@@ -32,6 +30,27 @@ enrich          Fetch each source URL (with Wayback fallback), extract metadata,
                 run regex-based category suggestions, and ask Gemini for
                 incident times/product/expanded description.
 ```
+
+### `import`
+
+```sh
+go run ./tool -action=import                   # fetch upstream + enrich new entries
+go run ./tool -action=import -no-enrich        # save new entries, skip the LLM step
+go run ./tool -action=import -source=./list.md # custom source (URL or file path)
+```
+
+`import` is the one-shot way to keep the corpus in sync. It:
+
+1. Reads `-source` (default: the [danluu/post-mortems](https://github.com/danluu/post-mortems) README).
+2. Skips any entry whose URL canonicalises (Wayback unwrap, http/https, `www.`,
+   trailing slash, fragment) to one already on disk, so previously enriched
+   fields are never overwritten.
+3. Saves the rest as fresh `data/<uuid>.md` files.
+4. Runs `enrich` on just those new UUIDs (unless `-no-enrich` or no GCP
+   credentials, in which case it logs a warning and stops after step 3).
+
+The steady state is cheap: nothing changes upstream → the run does an
+HTTP fetch and exits. Set up a daily cron and forget it.
 
 ### `enrich`
 

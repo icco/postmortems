@@ -23,15 +23,25 @@ var (
 `
 )
 
+// ImportReport summarises one ExtractPostmortems run.
+type ImportReport struct {
+	Source          string        // URL or file path that was read
+	Added           []*Postmortem // entries newly written to disk
+	SkippedExisting int           // upstream entries already in dir (canonical URL match)
+	SkippedInvalid  int           // upstream lines rejected (malformed URL etc.)
+}
+
 // ExtractPostmortems imports each postmortem entry from loc into its
 // own file under dir. The import is additive: an entry whose URL
 // canonicalises to one already present in dir is skipped, so previously
 // enriched fields (title, dates, archive URL, summary, expanded body
-// etc.) are preserved across re-imports.
-func ExtractPostmortems(loc string, dir string) error {
+// etc.) are preserved across re-imports. The returned report lists the
+// freshly-saved entries so callers can chain follow-up work (e.g.
+// enrichment) without re-scanning the directory.
+func ExtractPostmortems(loc string, dir string) (*ImportReport, error) {
 	posts, err := ValidateDir(dir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	have := make(map[string]bool, len(posts)*2)
@@ -49,7 +59,7 @@ func ExtractPostmortems(loc string, dir string) error {
 		// #nosec G107
 		resp, err := http.Get(loc)
 		if err != nil {
-			return fmt.Errorf("could not get %q: %w", loc, err)
+			return nil, fmt.Errorf("could not get %q: %w", loc, err)
 		}
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
@@ -59,18 +69,18 @@ func ExtractPostmortems(loc string, dir string) error {
 
 		data, err = io.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("could not read response body: %w", err)
+			return nil, fmt.Errorf("could not read response body: %w", err)
 		}
 	} else if isFile(loc) {
 		data, err = os.ReadFile(loc) // #nosec G304
 		if err != nil {
-			return fmt.Errorf("error opening file %q: %w", loc, err)
+			return nil, fmt.Errorf("error opening file %q: %w", loc, err)
 		}
 	} else {
-		return fmt.Errorf("%q is not a file or a url", loc)
+		return nil, fmt.Errorf("%q is not a file or a url", loc)
 	}
 
-	var added, skipped, invalid int
+	report := &ImportReport{Source: loc}
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		matches := re.FindStringSubmatch(scanner.Text())
@@ -81,14 +91,14 @@ func ExtractPostmortems(loc string, dir string) error {
 		rawURL := matches[2]
 		desc := matches[3]
 		if !looksLikeSingleURL(rawURL) {
-			invalid++
+			report.SkippedInvalid++
 			log.Warnw("skipping malformed entry", "url", rawURL, "company", company)
 			continue
 		}
 
 		canon := CanonicalURL(rawURL)
 		if have[canon] {
-			skipped++
+			report.SkippedExisting++
 			continue
 		}
 
@@ -100,29 +110,29 @@ func ExtractPostmortems(loc string, dir string) error {
 			Categories:  []string{categoryPostmortem},
 		}
 		if pm.Company == "" || pm.Description == "" {
-			invalid++
+			report.SkippedInvalid++
 			continue
 		}
 
 		if err := pm.Save(dir); err != nil {
-			return fmt.Errorf("error saving postmortem file: %w", err)
+			return nil, fmt.Errorf("error saving postmortem file: %w", err)
 		}
 		have[canon] = true
-		added++
+		report.Added = append(report.Added, pm)
 	}
 
 	if err := scanner.Err(); err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Infow("extracted postmortems",
 		"source", loc,
-		"added", added,
-		"skipped_existing", skipped,
-		"skipped_invalid", invalid,
+		"added", len(report.Added),
+		"skipped_existing", report.SkippedExisting,
+		"skipped_invalid", report.SkippedInvalid,
 	)
 
-	return nil
+	return report, nil
 }
 
 func isURL(tgt string) bool {

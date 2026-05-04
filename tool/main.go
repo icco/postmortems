@@ -30,6 +30,8 @@ var (
 	log            = logging.Must(logging.NewLogger(postmortems.Service))
 	action         = flag.String("action", "", "")
 	dir            = flag.String("dir", "./data/", "")
+	importSource   = flag.String("source", "", "import: URL or file path to read entries from (default: danluu/post-mortems README)")
+	importNoEnrich = flag.Bool("no-enrich", false, "import: skip the enrich step on newly added entries")
 	enrichApply    = flag.Bool("apply", false, "enrich: write changes back into the markdown files (default: dry run)")
 	enrichTimeout  = flag.Duration("http-timeout", 15*time.Second, "enrich: per-URL fetch timeout")
 	enrichOnly     = flag.String("only", "", "enrich: comma-separated list of UUID prefixes to process (default: all files)")
@@ -40,7 +42,7 @@ var (
 	gcpProject     = flag.String("gcp-project", os.Getenv("GOOGLE_CLOUD_PROJECT"), "enrich: GCP project for Vertex AI (defaults to GOOGLE_CLOUD_PROJECT)")
 	gcpLocation    = flag.String("gcp-location", "us-central1", "enrich: Vertex AI location/region")
 	geminiModel    = flag.String("gemini-model", "gemini-2.5-flash", "enrich: Gemini model name")
-	qs               = []*survey.Question{
+	qs             = []*survey.Question{
 		{
 			Name:     "url",
 			Prompt:   &survey.Input{Message: "URL of Postmortem?"},
@@ -85,17 +87,19 @@ var (
 	}
 )
 
-const (
-	usageText = `pm [options...]
+const usageText = `pm [options...]
 Options:
 -action     The action we should take.
 -dir        The directory with Markdown files for to extract or parse. Defaults to ./data
 
 Actions:
-extract         Import new postmortems from a local collection file (./tmp/posts.md).
-                Existing entries (matched by canonical URL, including Wayback
-                unwrap) are skipped so enriched fields aren't overwritten.
-upstream-fetch  Same as extract but pulls from https://github.com/danluu/post-mortems.
+import          Pull the latest entries from -source (default: danluu/post-mortems
+                README), additively save any new ones (existing entries are matched
+                by canonical URL with Wayback unwrap and never overwritten), then
+                enrich the freshly-added entries via Gemini. Idempotent: running it
+                repeatedly is cheap and only does work when upstream changes.
+                Pass -source=PATH for a different source, -no-enrich to skip the
+                LLM step, or any of the enrich flags to tune that step.
 generate        Generate JSON files from the postmortem Markdown files.
 new             Create a new postmortem file.
 validate        Validate the postmortem files in the directory.
@@ -106,9 +110,6 @@ enrich          Fetch each postmortem source URL (with Wayback fallback), extrac
                 Requires GOOGLE_APPLICATION_CREDENTIALS and a GCP project. Pass -apply to
                 write changes; -force to overwrite non-empty fields.
 `
-	danluuReadme = "https://raw.githubusercontent.com/danluu/post-mortems/master/README.md"
-	extractFile  = "./tmp/posts.md"
-)
 
 // Serve runs the HTTP server with otelhttp metrics exposed on /metrics.
 func Serve() error {
@@ -173,10 +174,8 @@ func main() {
 
 	var err error
 	switch *action {
-	case "extract":
-		err = postmortems.ExtractPostmortems(extractFile, *dir)
-	case "upstream-fetch":
-		err = postmortems.ExtractPostmortems(danluuReadme, *dir)
+	case "import":
+		err = runImport()
 	case "generate":
 		err = postmortems.GenerateJSON(*dir)
 	case "new":
@@ -194,6 +193,43 @@ func main() {
 	if err != nil {
 		log.Fatalw("running action failed", zap.Error(err))
 	}
+}
+
+// runImport wires the CLI flags into the import pipeline. The LLM
+// client is constructed best-effort: if it can't be built (missing
+// credentials, e.g. when run in CI) the import still proceeds and the
+// enrich step is skipped with a warning.
+func runImport() error {
+	ctx := context.Background()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	opts := importOptions{
+		Dir:      *dir,
+		Source:   *importSource,
+		NoEnrich: *importNoEnrich,
+		Logger:   logger,
+		Enrich: enrichOptions{
+			Force:           *enrichForce,
+			KeepDescription: *enrichKeepDesc,
+			MaxAge:          *enrichMaxAge,
+			HTTPTimeout:     *enrichTimeout,
+			Concurrency:     *enrichWorkers,
+			Logger:          logger,
+		},
+	}
+
+	if !*importNoEnrich {
+		llm, err := NewGeminiClient(ctx, *gcpProject, *gcpLocation, *geminiModel)
+		if err != nil {
+			logger.Warn("LLM unavailable, skipping enrich step", "err", err)
+		} else {
+			defer func() { _ = llm.Close() }()
+			opts.Enrich.LLM = llm
+		}
+	}
+
+	_, err := RunImport(ctx, opts)
+	return err
 }
 
 // runEnrich wires the CLI flags into the enrich pipeline. Kept out of
