@@ -177,11 +177,17 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		return res
 	}
 
-	originalURL, originalArchive := pm.URL, pm.ArchiveURL
+	// Pre-fetch normalisation: if the source URL itself is a Wayback
+	// snapshot, swap it for the origin and stash the snapshot in
+	// archive_url. This must persist even when the subsequent fetch
+	// fails so the file no longer points at the wrapper page.
+	var preChanged []string
 	if origin, snapshot, ok := ParseWaybackURL(pm.URL); ok {
 		pm.URL = origin
+		preChanged = append(preChanged, "url")
 		if pm.ArchiveURL == "" {
 			pm.ArchiveURL = snapshot
+			preChanged = append(preChanged, "archive_url")
 		}
 		res.URL = origin
 	}
@@ -189,6 +195,8 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	fr, err := fetcher.Fetch(ctx, pm.URL)
 	if err != nil {
 		res.Err = fmt.Errorf("fetch: %w", err)
+		res.Changed = preChanged
+		flushSave(pm, opts, &res, preChanged)
 		return res
 	}
 	res.UsedArchive = fr.UsedArchive
@@ -206,38 +214,37 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	})
 	if err != nil {
 		res.Err = fmt.Errorf("llm: %w", err)
+		res.Changed = preChanged
+		flushSave(pm, opts, &res, preChanged)
 		return res
 	}
 	res.Confidence = llmOut.Confidence
 
 	changed := mergeEnrichment(pm, fr, page, llmOut, opts)
-	if pm.URL != originalURL {
-		changed = append(changed, "url")
-	}
-	if pm.ArchiveURL != originalArchive {
-		// May already be in changed via mergeEnrichment's fr.ArchiveURL
-		// branch; dedupe to avoid double-listing.
-		found := false
-		for _, c := range changed {
-			if c == "archive_url" {
-				found = true
-				break
-			}
-		}
-		if !found {
-			changed = append(changed, "archive_url")
+	for _, c := range preChanged {
+		if !contains(changed, c) {
+			changed = append(changed, c)
 		}
 	}
 	res.Changed = changed
-
-	if !opts.Apply || len(changed) == 0 {
-		return res
-	}
-
-	if err := pm.Save(opts.Dir); err != nil {
-		res.Err = fmt.Errorf("save: %w", err)
-	}
+	flushSave(pm, opts, &res, changed)
 	return res
+}
+
+// flushSave writes pm back to disk when apply mode is on and at least
+// one field changed, surfacing any save error on res. Lets the caller
+// keep the existing fetch/llm error if both happen.
+func flushSave(pm *postmortems.Postmortem, opts enrichOptions, res *enrichResult, changed []string) {
+	if !opts.Apply || len(changed) == 0 {
+		return
+	}
+	if err := pm.Save(opts.Dir); err != nil {
+		if res.Err != nil {
+			res.Err = fmt.Errorf("%w; save: %w", res.Err, err)
+		} else {
+			res.Err = fmt.Errorf("save: %w", err)
+		}
+	}
 }
 
 func loadPostmortem(path string) (*postmortems.Postmortem, error) {
@@ -251,9 +258,10 @@ func loadPostmortem(path string) (*postmortems.Postmortem, error) {
 
 // mergeEnrichment writes fetch + LLM output into pm. Policy:
 //   - archive_url, source_fetched_at: always updated.
-//   - title/product/author/start/end/published_at: fill blanks; -force overwrites.
+//   - title/product/start/end/published_at: fill blanks; -force overwrites.
 //   - description: rewritten unless -keep-description; old body moves to summary.
 //   - keywords: union (case-insensitive).
+//   - categories: regex matches on the page text are unioned with existing.
 //
 // Returns the names of changed fields.
 func mergeEnrichment(pm *postmortems.Postmortem, fr FetchResult, page PageMetadata, llm EnrichOutput, opts enrichOptions) []string {
@@ -306,6 +314,11 @@ func mergeEnrichment(pm *postmortems.Postmortem, fr FetchResult, page PageMetada
 			pm.Keywords = merged
 			changed = append(changed, "keywords")
 		}
+	}
+
+	if suggestions := matchCategories(page.PlainText, pm.Categories); len(suggestions) > 0 {
+		pm.Categories = mergeCategories(pm.Categories, suggestions)
+		changed = append(changed, "categories")
 	}
 
 	if llm.ExpandedDescription != "" && !opts.KeepDescription {

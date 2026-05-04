@@ -24,38 +24,20 @@ generate        Generate JSON files from the postmortem Markdown files.
 new             Create a new postmortem file.
 validate        Validate the postmortem files in the directory.
 serve           Serve the postmortem files in a small website.
-categorize      Scrape each postmortem's source URL and suggest categories.
 enrich          Fetch each source URL (with Wayback fallback), extract metadata,
-                ask Gemini for incident times/product/expanded description,
-                and write the merged result back.
+                run regex-based category suggestions, and ask Gemini for
+                incident times/product/expanded description.
 ```
-
-### `categorize`
-
-The `categorize` action fetches each postmortem's source URL and greps
-the response body against a set of regular expressions per category
-(see `tool/categorize.go`). Without `-apply` it runs as a dry-run that
-prints suggestions to stdout. With `-apply` it merges the suggested
-categories back into each Markdown file.
-
-```sh
-# dry run
-go run ./tool -action=categorize
-
-# write suggestions back into ./data/*.md
-go run ./tool -action=categorize -apply
-```
-
-The tool is intentionally a one-shot helper: review the diff before
-committing. There is no automated PR-filing bot.
 
 ### `enrich`
 
 Fetches each `data/*.md` source URL (Wayback fallback for dead links),
-extracts page metadata, and asks Vertex Gemini for incident times,
-product, keywords, and an expanded description. The old one-liner
-moves into a `summary:` field; `archive_url:` is recorded for every
-entry.
+extracts page metadata, runs regex matching to suggest additional
+`categories`, and asks Vertex Gemini for incident times, product,
+keywords, and an expanded description. The old one-liner moves into a
+`summary:` field; `archive_url:` is recorded for every entry. Wayback
+URLs in the `url:` field are unwrapped to their original target and
+the snapshot moves to `archive_url:`.
 
 Needs `GOOGLE_APPLICATION_CREDENTIALS` and `GOOGLE_CLOUD_PROJECT` (or
 `-gcp-project`). Default model `gemini-2.5-flash` (~$0.10–$1 for the

@@ -1,6 +1,7 @@
 ---
 uuid: d6db1e76-af37-435c-83e9-e7c7cabfaf0f
-url: https://web.archive.org/web/20210818034431/https://medium.com/square-corner-blog/incident-summary-2017-03-16-2f65be39297
+url: https://medium.com/square-corner-blog/incident-summary-2017-03-16-2f65be39297
+archive_url: https://web.archive.org/web/20210818034431if_/https://medium.com/square-corner-blog/incident-summary-2017-03-16-2f65be39297
 title: Square service disruption of March 16, 2017
 start_time: 2017-03-16T17:02:00Z
 end_time: 2017-03-16T20:12:00Z
@@ -33,4 +34,3 @@ The root cause was identified as the Multipass service becoming unrecoverably ov
 Customers experienced a service outage for all merchants between 10:02 a.m. and 11:55 a.m. PDT. Additionally, two-factor authentication (2FA) via SMS was disrupted for a longer period, until 1:12 p.m. PDT.
 
 Initial remediation attempts, including rolling back Roster changes and restarting Multipass, were unsuccessful. Engineers then diagnosed the Redis retry issue in Multipass, developed a fix to reduce retries, and deployed it, which restored Multipass and payment flows. The subsequent 2FA SMS issue was resolved by contacting the SMS vendor and rebalancing outbound SMS phone numbers to increase capacity.
-

@@ -1,6 +1,7 @@
 ---
 uuid: cf16d8bc-b4cd-469d-94e4-e39fcec5aec9
-url: https://web.archive.org/web/20160426163728/https://medium.com/medium-eng/the-curious-case-of-disappearing-polish-s-fa398313d4df
+url: https://medium.com/medium-eng/the-curious-case-of-disappearing-polish-s-fa398313d4df
+archive_url: https://web.archive.org/web/20160426163728if_/https://medium.com/medium-eng/the-curious-case-of-disappearing-polish-s-fa398313d4df
 title: Medium editor bug preventing Polish 'Ś' character input
 categories:
 - postmortem
@@ -31,4 +32,3 @@ The root cause was a complex interaction of several historical and technical fac
 Consequently, typing Right Alt + S for 'Ś' was interpreted by the system as Ctrl + Alt + S. Medium's editor, however, had a specific code snippet designed to block Ctrl + S (and by extension, Ctrl + Alt + S) to prevent the browser's default "Save Page As" dialog from appearing, which was considered an annoying user experience. This unintended interception of Ctrl + Alt + S prevented the 'Ś' character from being input.
 
 The remediation involved a simple code change in Medium's editor. The fix was implemented "last week" (late January 2015) and involved modifying the logic to only block Ctrl + S if the Alt key was *not* pressed. This allowed the Ctrl + Alt + S combination, originating from Right Alt + S, to pass through and correctly produce the 'Ś' character.
-
