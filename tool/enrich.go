@@ -14,9 +14,7 @@ import (
 	"github.com/icco/postmortems"
 )
 
-// enrichOptions configures the enrich action. Sensible defaults are
-// applied in EnrichPostmortems so callers can pass a zero value for
-// non-critical fields.
+// enrichOptions configures the enrich action.
 type enrichOptions struct {
 	Dir             string
 	Only            string // process only this UUID; empty means all
@@ -30,10 +28,7 @@ type enrichOptions struct {
 	Logger          *slog.Logger // diagnostics; defaults to slog.Default()
 }
 
-// enrichResult records the outcome of processing one .md file. Err is
-// set on any terminal failure (load, fetch, llm, save); Skipped is set
-// when -max-age caused us to leave the file alone. Changed lists the
-// fields the merge layer would or did update.
+// enrichResult records the outcome of processing one .md file.
 type enrichResult struct {
 	Path        string
 	UUID        string
@@ -45,10 +40,9 @@ type enrichResult struct {
 	Err         error
 }
 
-// EnrichPostmortems walks every postmortem under opts.Dir, fetches its
-// source, asks the LLM for structured metadata, and (when Apply is
-// true) writes the merged result back. Errors per-file are surfaced on
-// the result struct rather than aborting the whole run.
+// EnrichPostmortems walks opts.Dir, fetches each source, calls the
+// LLM, and writes results back when Apply is true. Per-file errors are
+// surfaced on enrichResult instead of aborting the run.
 func EnrichPostmortems(ctx context.Context, opts enrichOptions) ([]enrichResult, error) {
 	if opts.Dir == "" {
 		return nil, fmt.Errorf("dir is required")
@@ -117,10 +111,8 @@ func EnrichPostmortems(ctx context.Context, opts enrichOptions) ([]enrichResult,
 	return out, nil
 }
 
-// enrichOne runs the full pipeline for a single file: load, freshness
-// check, fetch, extract HTML metadata, LLM call, merge, save. Each
-// step is allowed to fail; the result struct carries the failure (if
-// any) plus whatever progress was made.
+// enrichOne runs load -> freshness check -> fetch -> extract -> LLM ->
+// merge -> save for one file.
 func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path string) enrichResult {
 	res := enrichResult{Path: path}
 
@@ -182,7 +174,6 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	return res
 }
 
-// loadPostmortem opens path and returns the parsed Postmortem.
 func loadPostmortem(path string) (*postmortems.Postmortem, error) {
 	f, err := os.Open(path) // #nosec G304 -- iterated path under the configured data dir
 	if err != nil {
@@ -192,19 +183,13 @@ func loadPostmortem(path string) (*postmortems.Postmortem, error) {
 	return postmortems.Parse(f)
 }
 
-// mergeEnrichment applies the merge policy:
-//   - source_fetched_at and archive_url are always overwritten with the
-//     latest fetch results.
-//   - page-derived metadata (title/author/published_at) only fills in
-//     blanks unless -force.
-//   - LLM-derived fields (start/end/product/title/keywords) fill in
-//     blanks unless -force; description is always replaced unless
-//     -keep-description is set.
-//   - The previous one-line description is preserved into Summary when
-//     Summary is empty so we don't lose the human-curated blurb.
+// mergeEnrichment writes fetch + LLM output into pm. Policy:
+//   - archive_url, source_fetched_at: always updated.
+//   - title/product/author/start/end/published_at: fill blanks; -force overwrites.
+//   - description: rewritten unless -keep-description; old body moves to summary.
+//   - keywords: union (case-insensitive).
 //
-// Returns the list of field names that were modified, which doubles as
-// a "did anything change" signal for the caller.
+// Returns the names of changed fields.
 func mergeEnrichment(pm *postmortems.Postmortem, fr FetchResult, page PageMetadata, llm EnrichOutput, opts enrichOptions) []string {
 	var changed []string
 	set := func(name string, cur, next string, allowOverwrite bool) string {
@@ -273,12 +258,8 @@ func mergeEnrichment(pm *postmortems.Postmortem, fr FetchResult, page PageMetada
 	return changed
 }
 
-// mergeKeywords unions existing and additions, preserving existing
-// order then appending net-new keywords. Returns the merged slice and
-// whether any new keywords were added (so callers know whether to mark
-// the field as changed). When force is true, additions still cannot
-// duplicate existing entries — overwrite semantics don't make sense
-// for a free-form tag list.
+// mergeKeywords unions existing and additions case-insensitively,
+// preserving order. Returns merged and whether anything was added.
 func mergeKeywords(existing, additions []string, force bool) ([]string, bool) {
 	have := map[string]bool{}
 	for _, k := range existing {
@@ -302,8 +283,6 @@ func mergeKeywords(existing, additions []string, force bool) ([]string, bool) {
 	return out, added
 }
 
-// firstNonEmpty returns the first non-empty string from the args, or
-// empty if all are empty. Used to pick between LLM and HTML title.
 func firstNonEmpty(s ...string) string {
 	for _, v := range s {
 		if v != "" {
@@ -313,10 +292,7 @@ func firstNonEmpty(s ...string) string {
 	return ""
 }
 
-// LogEnrichReport emits one structured log event per enrichment result
-// plus a summary line. Logger may be nil, in which case slog.Default()
-// is used. Mirrors the shape of the categorize tool's text report but
-// rides on slog so the output is filterable / re-handlable.
+// LogEnrichReport emits one slog event per result plus a summary.
 func LogEnrichReport(logger *slog.Logger, res []enrichResult, apply bool) {
 	if logger == nil {
 		logger = slog.Default()

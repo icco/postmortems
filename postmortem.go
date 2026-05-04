@@ -18,15 +18,9 @@ import (
 
 // Postmortem is a postmortem summary plus its metadata.
 //
-// StartTime and EndTime together describe the "Event Date Period" the
-// postmortem is about (the from/to of the incident itself). Either may
-// be the zero value to indicate that bound is unknown.
-//
-// The Source* fields and ArchiveURL are populated by the `enrich` tool
-// from the upstream URL; they are omitempty so legacy files without
-// them round-trip cleanly. Summary holds the original short blurb when
-// the description body is rewritten with a longer extract from the
-// source page.
+// StartTime/EndTime bound the incident itself (either may be zero).
+// Source* and ArchiveURL are populated by the `enrich` tool. Summary
+// holds the original blurb when the description gets rewritten.
 type Postmortem struct {
 	UUID              string    `yaml:"uuid"`
 	URL               string    `yaml:"url"`

@@ -11,9 +11,7 @@ import (
 	"google.golang.org/genai"
 )
 
-// EnrichInput is the bundle of context handed to the LLM. The LLM is
-// instructed to ground its output in PageText and to cite PageTitle
-// when relevant.
+// EnrichInput is the context handed to the LLM for one postmortem.
 type EnrichInput struct {
 	URL         string
 	Company     string
@@ -25,11 +23,8 @@ type EnrichInput struct {
 	UsedArchive bool
 }
 
-// EnrichOutput is the structured result the LLM is asked to return.
-// All fields are optional from the model's perspective; we instruct it
-// to leave a field empty/zero rather than guess. Confidence is a free
-// text label ("low" / "medium" / "high") that we surface in the report
-// but don't otherwise act on.
+// EnrichOutput is the structured result the LLM returns. Fields are
+// empty/zero when the model couldn't ground them.
 type EnrichOutput struct {
 	Title               string
 	Product             string
@@ -41,25 +36,19 @@ type EnrichOutput struct {
 	Notes               string
 }
 
-// LLMClient abstracts the Gemini call so the orchestrator can be unit
-// tested with a fake implementation that returns canned results.
+// LLMClient lets tests stub the Gemini call.
 type LLMClient interface {
 	Enrich(ctx context.Context, in EnrichInput) (EnrichOutput, error)
 	Close() error
 }
 
-// geminiClient is a thin wrapper around google.golang.org/genai
-// configured for Vertex AI. Construction picks up Application Default
-// Credentials, so callers only need GOOGLE_APPLICATION_CREDENTIALS (or
-// `gcloud auth application-default login`) plus a project + location.
 type geminiClient struct {
 	client *genai.Client
 	model  string
 	cfg    *genai.GenerateContentConfig
 }
 
-// NewGeminiClient dials the Vertex AI endpoint for project/location and
-// configures the named model to emit JSON matching enrichSchema.
+// NewGeminiClient builds a Vertex AI client. Uses ADC for auth.
 func NewGeminiClient(ctx context.Context, project, location, modelName string) (LLMClient, error) {
 	if project == "" {
 		return nil, fmt.Errorf("gcp project is required (set -gcp-project or GOOGLE_CLOUD_PROJECT)")
@@ -92,10 +81,7 @@ func NewGeminiClient(ctx context.Context, project, location, modelName string) (
 
 func (g *geminiClient) Close() error { return nil }
 
-// Enrich asks Gemini to extract structured metadata for a single
-// postmortem and returns the parsed result. Empty/zero fields in the
-// returned EnrichOutput indicate the model was unable to ground a
-// value, not that it failed.
+// Enrich asks Gemini for structured metadata for one postmortem.
 func (g *geminiClient) Enrich(ctx context.Context, in EnrichInput) (EnrichOutput, error) {
 	prompt := buildPrompt(in)
 	resp, err := g.client.Models.GenerateContent(ctx, g.model, []*genai.Content{
@@ -146,9 +132,7 @@ func (g *geminiClient) Enrich(ctx context.Context, in EnrichInput) (EnrichOutput
 	return out, nil
 }
 
-// cleanStrings trims whitespace, drops empties, and dedupes (keeping
-// first occurrence) so noisy keyword arrays from the LLM round-trip
-// cleanly into YAML.
+// cleanStrings trims, drops empties, and dedupes.
 func cleanStrings(in []string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -163,10 +147,7 @@ func cleanStrings(in []string) []string {
 	return out
 }
 
-// buildPrompt constructs the user message for the LLM. The schema we
-// configured on the model already constrains the output shape, but we
-// repeat the contract here so the model can reason about field
-// semantics (especially "leave empty if unsure").
+// buildPrompt constructs the user message for the LLM.
 func buildPrompt(in EnrichInput) string {
 	var sb strings.Builder
 	sb.WriteString("You are extracting structured metadata about a published postmortem (incident write-up).\n")
@@ -223,10 +204,7 @@ func nonEmpty(s string) string {
 	return s
 }
 
-// enrichSchema describes the JSON shape we want Gemini to return. The
-// SDK forwards this as the OpenAPI schema portion of the request and
-// rejects responses that don't match — meaning we don't have to do
-// schema validation ourselves.
+// enrichSchema is the OpenAPI schema for the Gemini JSON response.
 func enrichSchema() *genai.Schema {
 	str := func(desc string) *genai.Schema {
 		return &genai.Schema{Type: genai.TypeString, Description: desc}

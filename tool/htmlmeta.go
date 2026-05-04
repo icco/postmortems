@@ -8,9 +8,8 @@ import (
 	"golang.org/x/net/html"
 )
 
-// PageMetadata is the structured information we lift out of a fetched
-// HTML body before handing it to the LLM. PlainText is best-effort
-// visible text suitable for prompt context; it may be truncated.
+// PageMetadata is what we extract from an HTML body before handing it
+// to the LLM. PlainText may be truncated.
 type PageMetadata struct {
 	Title       string
 	Author      string
@@ -18,16 +17,11 @@ type PageMetadata struct {
 	PlainText   string
 }
 
-// maxPlainTextChars caps the body slice we feed to Gemini. Most flash
-// models comfortably handle this much input, and most postmortem write
-// ups summarise themselves in the first few thousand characters.
 const maxPlainTextChars = 20000
 
-// ExtractMetadata walks the parsed HTML once, capturing the highest
-// quality version of each metadata field (OpenGraph beats <meta>,
-// JSON-LD beats both for date/author) and accumulating visible text.
-// Errors parsing the HTML degrade gracefully — we return whatever we
-// managed to collect.
+// ExtractMetadata pulls title/author/published_at and visible text from
+// htmlBody. OpenGraph beats <meta> beats <title>; JSON-LD wins for
+// author/date. Returns partial results on parse error.
 func ExtractMetadata(htmlBody string) PageMetadata {
 	out := PageMetadata{}
 	if strings.TrimSpace(htmlBody) == "" {
@@ -100,11 +94,8 @@ func ExtractMetadata(htmlBody string) PageMetadata {
 	return out
 }
 
-// absorbMeta inspects a single <meta> tag and updates the running
-// best-known values for title/author/publishedAt. Lower-quality fields
-// are not allowed to overwrite higher-quality ones (e.g. og:title wins
-// over twitter:title which wins over <title>; we already prioritise
-// JSON-LD for author/date elsewhere).
+// absorbMeta updates running best values from a single <meta> tag.
+// Higher-quality sources (og:title > twitter:title > <title>) win.
 func absorbMeta(n *html.Node, ogTitle, twTitle, author *string, publishedAt *time.Time) {
 	property := strings.ToLower(attr(n, "property"))
 	name := strings.ToLower(attr(n, "name"))
@@ -128,10 +119,8 @@ func absorbMeta(n *html.Node, ogTitle, twTitle, author *string, publishedAt *tim
 	}
 }
 
-// absorbJSONLD scans a <script type="application/ld+json"> block for
-// schema.org BlogPosting / NewsArticle / Article style metadata. Many
-// CMSes (WordPress, Ghost, Medium) emit this and it's the most reliable
-// source for `datePublished` and structured author data.
+// absorbJSONLD scans a JSON-LD block for schema.org datePublished /
+// author. Most CMSes emit this and it beats meta tags.
 func absorbJSONLD(n *html.Node, author *string, publishedAt *time.Time) {
 	raw := strings.TrimSpace(textOf(n))
 	if raw == "" {
@@ -144,9 +133,8 @@ func absorbJSONLD(n *html.Node, author *string, publishedAt *time.Time) {
 	walkJSONLD(any, author, publishedAt)
 }
 
-// walkJSONLD recursively descends arbitrary JSON-LD structures (some
-// pages emit a list, some a graph, some a single object) and pulls out
-// `datePublished` / `author` whenever they appear.
+// walkJSONLD recurses through JSON-LD (object, list, or @graph) and
+// fills author/publishedAt on first hit.
 func walkJSONLD(v interface{}, author *string, publishedAt *time.Time) {
 	switch x := v.(type) {
 	case map[string]interface{}:
@@ -190,7 +178,6 @@ func walkJSONLD(v interface{}, author *string, publishedAt *time.Time) {
 	}
 }
 
-// attr returns the value of attribute key on n, or "" if absent.
 func attr(n *html.Node, key string) string {
 	for _, a := range n.Attr {
 		if strings.EqualFold(a.Key, key) {
@@ -200,9 +187,7 @@ func attr(n *html.Node, key string) string {
 	return ""
 }
 
-// textOf concatenates all descendant text of n verbatim. Used for
-// elements (e.g. <title>, JSON-LD scripts) where we want raw content
-// rather than skipping over them.
+// textOf concatenates n's descendant text verbatim.
 func textOf(n *html.Node) string {
 	var sb strings.Builder
 	var walk func(*html.Node)
@@ -218,10 +203,8 @@ func textOf(n *html.Node) string {
 	return sb.String()
 }
 
-// tryParseTime walks a small set of common date layouts (ISO 8601,
-// RFC1123, plain dates, slash-separated, and a few CMS quirks) and
-// returns the parsed time on the first match. Returns false when none
-// of the layouts apply.
+// tryParseTime tries a handful of common layouts (ISO 8601, RFC1123,
+// plain/slash dates) and returns the first match.
 func tryParseTime(s string) (time.Time, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -251,9 +234,7 @@ func tryParseTime(s string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// stripTags is a fallback used when html.Parse fails outright. It
-// removes anything between '<' and '>' and collapses whitespace; not
-// pretty, but enough to keep the LLM call from receiving raw HTML.
+// stripTags is a regex-free fallback for when html.Parse fails.
 func stripTags(s string) string {
 	var sb strings.Builder
 	skip := false
@@ -272,9 +253,7 @@ func stripTags(s string) string {
 	return collapseWhitespace(sb.String())
 }
 
-// collapseWhitespace replaces any run of whitespace (including
-// newlines) with a single space. Cheaper than a regex and produces the
-// same shape of output for our purposes.
+// collapseWhitespace replaces runs of whitespace with a single space.
 func collapseWhitespace(s string) string {
 	var sb strings.Builder
 	prevSpace := true
@@ -292,8 +271,7 @@ func collapseWhitespace(s string) string {
 	return strings.TrimSpace(sb.String())
 }
 
-// truncate returns s shortened to at most n runes, suffixing an
-// ellipsis when truncation actually happens so the LLM can tell.
+// truncate clips s to n bytes with an ellipsis when truncated.
 func truncate(s string, n int) string {
 	if n <= 0 || len(s) <= n {
 		return s

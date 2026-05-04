@@ -13,22 +13,11 @@ import (
 	"time"
 )
 
-// userAgent is sent with every outbound HTTP request from the enrich
-// pipeline so site owners can see where the traffic is coming from.
 const userAgent = "icco-postmortems-enricher/1.0 (+https://postmortems.app)"
-
-// maxBody caps the bytes we read from any single response. Postmortem
-// articles are essays, not multi-megabyte downloads — anything bigger
-// is almost certainly a bad redirect or a giant CDN page we can't make
-// sense of anyway. The truncated body is still passed downstream so
-// best-effort extraction can succeed.
 const maxBody = 4 * 1024 * 1024 // 4 MiB
 
-// FetchResult is the outcome of a single source fetch. RawHTML is
-// always set when err is nil; ArchiveURL is set when a Wayback snapshot
-// exists, regardless of whether origin succeeded. FinalURL records
-// where the body actually came from so downstream tools can attribute
-// content correctly.
+// FetchResult is the outcome of one source fetch. ArchiveURL is set
+// whenever Wayback has a snapshot, even on origin success.
 type FetchResult struct {
 	OriginURL    string
 	OriginStatus int
@@ -39,10 +28,8 @@ type FetchResult struct {
 	UsedArchive  bool
 }
 
-// Fetcher pairs an http.Client with a small per-process cache of
-// Wayback availability lookups so re-running enrich during the same
-// invocation does not hammer archive.org. The zero value is not safe
-// to use; build one with NewFetcher.
+// Fetcher caches Wayback availability lookups per process so retries
+// don't re-hit archive.org. Build one with NewFetcher.
 type Fetcher struct {
 	client *http.Client
 
@@ -50,9 +37,7 @@ type Fetcher struct {
 	cache map[string]string // origin URL -> archive snapshot URL ("" = looked up, none available)
 }
 
-// NewFetcher returns a Fetcher whose underlying http.Client times out
-// after the supplied duration. A zero or negative timeout falls back
-// to 15 seconds, matching the categorize tool's default.
+// NewFetcher returns a Fetcher with the given client timeout (15s if zero).
 func NewFetcher(timeout time.Duration) *Fetcher {
 	if timeout <= 0 {
 		timeout = 15 * time.Second
@@ -63,10 +48,8 @@ func NewFetcher(timeout time.Duration) *Fetcher {
 	}
 }
 
-// Fetch retrieves rawURL, falling back to the Wayback Machine when the
-// origin returns non-2xx or refuses to talk. Even on origin success the
-// closest Wayback snapshot URL is recorded so dead links stay
-// retrievable.
+// Fetch GETs rawURL, falling back to the closest Wayback snapshot when
+// the origin fails. ArchiveURL is recorded either way.
 func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (FetchResult, error) {
 	res := FetchResult{
 		OriginURL: rawURL,
@@ -104,9 +87,7 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (FetchResult, error)
 	return res, nil
 }
 
-// get is a thin wrapper around http.Get that enforces the user-agent,
-// caps the response body, and returns the response status alongside
-// any error. The body is closed before returning.
+// get GETs rawURL with the standard user-agent and capped body.
 func (f *Fetcher) get(ctx context.Context, rawURL string) (string, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -132,10 +113,8 @@ func (f *Fetcher) get(ctx context.Context, rawURL string) (string, int, error) {
 	return string(body), resp.StatusCode, nil
 }
 
-// archiveLookup hits the Wayback availability API and returns the
-// closest snapshot URL (empty string if none). Results are cached in
-// memory for the lifetime of the Fetcher to avoid re-querying the same
-// URL on retries within a single run.
+// archiveLookup returns the closest Wayback snapshot URL ("" if none),
+// caching results for the Fetcher's lifetime.
 func (f *Fetcher) archiveLookup(ctx context.Context, target string) (string, error) {
 	f.mu.Lock()
 	if v, ok := f.cache[target]; ok {
@@ -177,8 +156,8 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string) (string, err
 		return "", nil
 	}
 
-	// Wayback returns http:// even for HTTPS-capable snapshots; bump it
-	// up so we don't get a redirect on the follow-up GET.
+	// Wayback returns http:// even for HTTPS-capable snapshots; bump
+	// it to skip the redirect on the follow-up GET.
 	if strings.HasPrefix(snap, "http://web.archive.org/") {
 		snap = "https://" + strings.TrimPrefix(snap, "http://")
 	}
