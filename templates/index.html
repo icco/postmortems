@@ -8,6 +8,7 @@
         <tr>
           <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white">UUID</th>
           <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white sortable-th" data-sort-key="company">Company <span class="sort-arrow"></span></th>
+          <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white sortable-th" data-sort-key="date">Date <span class="sort-arrow"></span></th>
           <th class="fw6 bb b--black-20 tl pb3 pr3 bg-white sortable-th" data-sort-key="category">Category <span class="sort-arrow"></span></th>
         </tr>
       </thead>
@@ -16,6 +17,7 @@
         <tr>
           <td class="pv3 pr3 bb b--black-20"><a href="/postmortem/{{ .UUID }}">{{ .UUID }}</a></td>
           <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ .Company }}">{{ .Company }}</td>
+          <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ .EventDatePeriod }}">{{ .EventDatePeriod }}</td>
           <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ range .Categories }}{{ . }} {{end}}">
             {{ range .Categories }}
             <a href="/category/{{ . }}">{{ . }}</a>

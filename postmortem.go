@@ -17,6 +17,10 @@ import (
 )
 
 // Postmortem is a postmortem summary plus its metadata.
+//
+// StartTime and EndTime together describe the "Event Date Period" the
+// postmortem is about (the from/to of the incident itself). Either may
+// be the zero value to indicate that bound is unknown.
 type Postmortem struct {
 	UUID        string    `yaml:"uuid"`
 	URL         string    `yaml:"url"`
@@ -26,6 +30,33 @@ type Postmortem struct {
 	Company     string    `yaml:"company"`
 	Product     string    `yaml:"product"`
 	Description string    `yaml:"-"`
+}
+
+// HasEventDates reports whether the postmortem has any event date
+// information (start, end, or both).
+func (pm *Postmortem) HasEventDates() bool {
+	return !pm.StartTime.IsZero() || !pm.EndTime.IsZero()
+}
+
+// EventDatePeriod returns a human-readable rendering of the event
+// from/to dates suitable for display next to a postmortem. Returns the
+// empty string if neither bound is set, so callers (templates) can
+// safely render it unconditionally.
+func (pm *Postmortem) EventDatePeriod() string {
+	const layout = "2006-01-02"
+	s, e := pm.StartTime.UTC(), pm.EndTime.UTC()
+	switch {
+	case pm.StartTime.IsZero() && pm.EndTime.IsZero():
+		return ""
+	case pm.StartTime.IsZero():
+		return "until " + e.Format(layout)
+	case pm.EndTime.IsZero():
+		return s.Format(layout)
+	case s.Format(layout) == e.Format(layout):
+		return s.Format(layout)
+	default:
+		return s.Format(layout) + " \u2013 " + e.Format(layout)
+	}
 }
 
 const categoryPostmortem = "postmortem"
@@ -50,6 +81,33 @@ var (
 	log = logging.Must(logging.NewLogger(Service))
 )
 
+// parseFrontmatterTime accepts the various shapes a YAML scalar can take
+// for a date field (time.Time, an empty/missing value, or a string) and
+// returns the parsed time.Time. The zero time is returned for missing
+// or empty values; this matches the existing on-disk convention of
+// `start_time: ""` meaning "unknown".
+func parseFrontmatterTime(v interface{}) (time.Time, error) {
+	switch x := v.(type) {
+	case nil:
+		return time.Time{}, nil
+	case time.Time:
+		return x, nil
+	case string:
+		if x == "" {
+			return time.Time{}, nil
+		}
+		layouts := []string{time.RFC3339, "2006-01-02", "2006-01-02T15:04:05"}
+		for _, l := range layouts {
+			if t, err := time.Parse(l, x); err == nil {
+				return t, nil
+			}
+		}
+		return time.Time{}, fmt.Errorf("could not parse time %q", x)
+	default:
+		return time.Time{}, fmt.Errorf("unexpected type %T for time field", v)
+	}
+}
+
 // Parse turns an io stream into a Postmortem type.
 func Parse(f io.Reader) (*Postmortem, error) {
 	p := &Postmortem{}
@@ -66,12 +124,16 @@ func Parse(f io.Reader) (*Postmortem, error) {
 		p.UUID = uuid
 	}
 
-	if startTime, ok := fm["start_time"].(time.Time); ok {
-		p.StartTime = startTime
+	if t, err := parseFrontmatterTime(fm["start_time"]); err == nil {
+		p.StartTime = t
+	} else {
+		return nil, fmt.Errorf("start_time: %w", err)
 	}
 
-	if endTime, ok := fm["end_time"].(time.Time); ok {
-		p.EndTime = endTime
+	if t, err := parseFrontmatterTime(fm["end_time"]); err == nil {
+		p.EndTime = t
+	} else {
+		return nil, fmt.Errorf("end_time: %w", err)
 	}
 
 	if url, ok := fm["url"].(string); ok {
