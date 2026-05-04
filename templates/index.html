@@ -18,7 +18,7 @@
           <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }}{{ end }}">
             <a href="/postmortem/{{ .UUID }}">{{ if .Title }}{{ .Title }}{{ else }}{{ .Company }}{{ end }}</a>
           </td>
-          <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ .Company }}">{{ .Company }}</td>
+          <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ .Company }}"><a href="/company/{{ companySlug .Company }}">{{ .Company }}</a></td>
           <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ .EventDatePeriod }}">{{ .EventDatePeriod }}</td>
           <td class="pv3 pr3 bb b--black-20" data-sort-value="{{ range .Categories }}{{ . }} {{end}}">
             {{ range .Categories }}
