@@ -452,3 +452,57 @@ func TestGetPosmortemByCategory(t *testing.T) {
 		})
 	}
 }
+
+func TestSitemapHandler(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(cwd); err != nil {
+			t.Logf("chdir back: %v", err)
+		}
+	})
+	if err := os.Chdir(".."); err != nil {
+		t.Fatalf("chdir to repo root: %v", err)
+	}
+
+	h := New(Options{Logger: zap.NewNop().Sugar(), Dir: "testdata"})
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/sitemap.xml") //nolint:noctx // test
+	if err != nil {
+		t.Fatalf("get sitemap.xml: %v", err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("close body: %v", err)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/xml") {
+		t.Errorf("content-type = %q, want application/xml", ct)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	text := string(body)
+
+	for _, want := range []string{
+		`<?xml version="1.0" encoding="UTF-8"?>`,
+		`xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"`,
+		"/postmortem/" + testUUID,
+		"/category/postmortem",
+		"/company/ccp-games",
+		"/about",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("sitemap.xml missing %q\nbody:\n%s", want, text)
+		}
+	}
+}

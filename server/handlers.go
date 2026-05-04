@@ -3,6 +3,7 @@ package server
 
 import (
 	"compress/flate"
+	"encoding/xml"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -76,6 +77,7 @@ func New(opts Options) http.Handler {
 	r.Get("/category/{category}", categoryPageHandler(opts.Dir))
 	r.Get("/company/{company}", companyPageHandler(opts.Dir))
 	r.Get("/healthz", healthzHandler)
+	r.Get("/sitemap.xml", sitemapHandler(opts.Dir))
 
 	if opts.MetricsHandler != nil {
 		r.Method(http.MethodGet, "/metrics", opts.MetricsHandler)
@@ -416,5 +418,111 @@ func indexHandler(dir string) http.HandlerFunc {
 		}
 
 		renderTemplate(w, r, "index.html", page)
+	}
+}
+
+// sitemapURL is a single <url> entry in the sitemap.
+type sitemapURL struct {
+	Loc        string `xml:"loc"`
+	ChangeFreq string `xml:"changefreq,omitempty"`
+	Priority   string `xml:"priority,omitempty"`
+}
+
+// sitemapURLSet is the root element of sitemap.xml.
+type sitemapURLSet struct {
+	XMLName xml.Name     `xml:"urlset"`
+	Xmlns   string       `xml:"xmlns,attr"`
+	URLs    []sitemapURL `xml:"url"`
+}
+
+// baseURL derives the scheme+host for absolute URLs in the sitemap from
+// the incoming request. It honours the X-Forwarded-Proto header so the
+// sitemap works correctly behind a TLS-terminating reverse proxy.
+func baseURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	}
+	return scheme + "://" + r.Host
+}
+
+// sitemapHandler generates a dynamic sitemap.xml covering all postmortems,
+// categories, companies and the static pages of the site.
+func sitemapHandler(dir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := logging.FromContext(r.Context())
+
+		pms, err := LoadPostmortems(dir)
+		if err != nil {
+			l.Errorw("sitemap: load postmortems", zap.Error(err))
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		base := baseURL(r)
+
+		urls := []sitemapURL{
+			{Loc: base + "/", ChangeFreq: "daily", Priority: "1.0"},
+			{Loc: base + "/about", ChangeFreq: "monthly", Priority: "0.5"},
+		}
+
+		// One entry per category.
+		for _, cat := range postmortems.Categories {
+			urls = append(urls, sitemapURL{
+				Loc:        base + "/category/" + cat,
+				ChangeFreq: "weekly",
+				Priority:   "0.6",
+			})
+		}
+
+		// Collect unique companies.
+		seen := map[string]bool{}
+		for _, pm := range pms {
+			slug := CompanySlug(pm.Company)
+			if slug != "" && !seen[slug] {
+				seen[slug] = true
+				urls = append(urls, sitemapURL{
+					Loc:        base + "/company/" + slug,
+					ChangeFreq: "weekly",
+					Priority:   "0.6",
+				})
+			}
+		}
+
+		// One entry per postmortem.
+		for _, pm := range pms {
+			urls = append(urls, sitemapURL{
+				Loc:        base + "/postmortem/" + pm.UUID,
+				ChangeFreq: "monthly",
+				Priority:   "0.8",
+			})
+		}
+
+		urlset := sitemapURLSet{
+			Xmlns: "http://www.sitemaps.org/schemas/sitemap/0.9",
+			URLs:  urls,
+		}
+
+		// Build the full response body in memory before writing any headers so
+		// that a serialisation error doesn't leave the client with a 200 status
+		// and a truncated body.
+		var buf strings.Builder
+		buf.WriteString(xml.Header)
+		enc := xml.NewEncoder(&buf)
+		enc.Indent("", "  ")
+		if err := enc.Encode(urlset); err != nil {
+			l.Errorw("sitemap: encode xml", zap.Error(err))
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(buf.String())); err != nil {
+			l.Errorw("sitemap: write response", zap.Error(err))
+		}
 	}
 }
