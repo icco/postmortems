@@ -429,6 +429,8 @@ func TestLooksLikeJunkDescription(t *testing.T) {
 		"It serves as a marketing and informational resource for Google Cloud's observability suite.",
 		"The nature of the underlying failure is not detailed in the provided information.",
 		"Information regarding remediation steps is not available from the provided summary.",
+		"While specific remediation details are not provided, the incident would have necessitated a rollback.",
+		"Specific details about the timeline are not provided in the source.",
 	}
 	for _, s := range junk {
 		if !looksLikeJunkDescription(s) {

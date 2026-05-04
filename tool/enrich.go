@@ -82,6 +82,9 @@ var junkDescriptionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bmarketing and informational resource\b`),
 	regexp.MustCompile(`(?i)\bnot detailed in the provided\b`),
 	regexp.MustCompile(`(?i)\bis not (available|present|detailed) (from|in) the (provided|given|article)\b`),
+	regexp.MustCompile(`(?i)\bwhile specific .{0,40} (are |is )?not provided\b`),
+	regexp.MustCompile(`(?i)\bwould have necessitated\b`),
+	regexp.MustCompile(`(?i)\bspecific .{0,30} (are|is) not (provided|detailed|specified)\b`),
 }
 
 // titleFromPage reports whether stored looks like it was scraped from
