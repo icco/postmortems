@@ -107,6 +107,13 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (FetchResult, error)
 	return res, nil
 }
 
+// GetRaw GETs rawURL directly with no Wayback fallback. Useful when
+// the caller already knows which URL it wants (e.g. the archive
+// snapshot itself) and wants to avoid the availability lookup.
+func (f *Fetcher) GetRaw(ctx context.Context, rawURL string) (string, int, error) {
+	return f.get(ctx, rawURL)
+}
+
 // get GETs rawURL with the standard user-agent and capped body.
 func (f *Fetcher) get(ctx context.Context, rawURL string) (string, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)

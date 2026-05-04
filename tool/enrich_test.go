@@ -382,6 +382,14 @@ func TestIsBadTitle(t *testing.T) {
 		"Wayback Machine", "Internet Archive", "Just a moment...",
 		"Attention Required! | Cloudflare", "Access denied",
 		"404", "Page not found", "Untitled Document",
+		"PagerDuty Status Page", "Stripe Status Page",
+		"Redirecting...", "Redirecting",
+		"Help Center Closed", "Help Center",
+		"Loading...", "Loading",
+		"Reddit - Please wait for verification",
+		"Please wait while we verify your browser",
+		"Updates on the status of Stripe services",
+		"403 Forbidden",
 	}
 	for _, s := range bad {
 		if !isBadTitle(s) {
@@ -393,10 +401,44 @@ func TestIsBadTitle(t *testing.T) {
 		"GitHub Pages downtime, Sept 2018",
 		"Status of GitLab during the great migration",
 		"How we recovered from a status page outage",
+		"Discord Connectivity Issues (March 2017)",
 	}
 	for _, s := range good {
 		if isBadTitle(s) {
 			t.Errorf("isBadTitle(%q) = true, want false", s)
+		}
+	}
+}
+
+func TestLooksLikeJunkDescription(t *testing.T) {
+	t.Parallel()
+	junk := []string{
+		"The provided article text is the Dropbox Tech Blog homepage, not the specific postmortem.",
+		"The provided text describes the mission of the Archive Team.",
+		"The article does not contain any information regarding the incident.",
+		"Therefore, details cannot be extracted from this source.",
+		"The provided text is too short to generate a meaningful description.",
+		"This is a marketing and product overview page for Google Cloud.",
+		"The provided article text is a placeholder indicating the page is loading.",
+		"The provided article text is a status page for PagerDuty.",
+		"The provided article text is in raw PDF format and is not human-readable.",
+		"The provided article text is limited to Wayback Machine capture metadata.",
+		"Redirecting...",
+		"This is a Cloudflare challenge page; we cannot read the content.",
+	}
+	for _, s := range junk {
+		if !looksLikeJunkDescription(s) {
+			t.Errorf("looksLikeJunkDescription(%q) = false, want true", s)
+		}
+	}
+	real := []string{
+		"On March 20, 2017, Discord experienced significant connectivity issues.",
+		"The Swedish warship Vasa embarked on its maiden voyage on August 10, 1628.",
+		"At 10:25 PM PDT, severe weather caused a utility power loss at a regional substation.",
+	}
+	for _, s := range real {
+		if looksLikeJunkDescription(s) {
+			t.Errorf("looksLikeJunkDescription(%q) = true, want false", s)
 		}
 	}
 }

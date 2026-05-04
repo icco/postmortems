@@ -17,17 +17,26 @@ import (
 
 // badTitlePatterns marks page-title scrapes that aren't actually
 // describing the postmortem (status-page chrome, archive wrappers,
-// captcha walls). These get treated as empty so the LLM/page-title
-// pipeline can replace them on the next enrich pass.
+// captcha walls, generic blog/help-center landings). These get treated
+// as empty so the LLM/page-title pipeline can replace them on the next
+// enrich pass.
 var badTitlePatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)^(.{1,20}\s)?status$`),
+	regexp.MustCompile(`(?i)^(.{1,30}\s)?status$`),
+	regexp.MustCompile(`(?i)^.{1,30} status page$`),
 	regexp.MustCompile(`(?i)^wayback machine$`),
 	regexp.MustCompile(`(?i)^internet archive$`),
 	regexp.MustCompile(`(?i)^just a moment\.?\.?\.?$`),
 	regexp.MustCompile(`(?i)^attention required.*$`),
 	regexp.MustCompile(`(?i)^access denied$`),
+	regexp.MustCompile(`(?i)^(403 forbidden|forbidden)$`),
 	regexp.MustCompile(`(?i)^(404|page not found|not found)$`),
 	regexp.MustCompile(`(?i)^untitled.*$`),
+	regexp.MustCompile(`(?i)^redirecting\.?\.?\.?$`),
+	regexp.MustCompile(`(?i)^help center.*$`),
+	regexp.MustCompile(`(?i)^loading\.?\.?\.?$`),
+	regexp.MustCompile(`(?i)please wait.*verification`),
+	regexp.MustCompile(`(?i)^please wait.*$`),
+	regexp.MustCompile(`(?i)^updates? on the status of .*$`),
 }
 
 // isBadTitle reports whether s looks like generic page chrome rather
@@ -38,6 +47,43 @@ func isBadTitle(s string) bool {
 		return true
 	}
 	for _, re := range badTitlePatterns {
+		if re.MatchString(s) {
+			return true
+		}
+	}
+	return false
+}
+
+// junkDescriptionPatterns match the standard "I had nothing to work
+// with" disclaimers Gemini emits when the page text is a homepage,
+// status-page chrome, paywall, captcha, raw PDF, redirect notice, etc.
+// We use the description as a signal that the LLM judged the source
+// useless and discard the entire LLM result rather than persist it.
+var junkDescriptionPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)\bthe (provided|given) (article )?(text|content|source)\b`),
+	regexp.MustCompile(`(?i)\bdoes not contain (any )?(specific )?(details|information|content)\b`),
+	regexp.MustCompile(`(?i)\bcannot be (extracted|generated|determined|derived)\b`),
+	regexp.MustCompile(`(?i)\bis (extremely |too )(brief|short)\b`),
+	regexp.MustCompile(`(?i)\bis a (marketing|product overview|promotional|landing|sales).*\bpage\b`),
+	regexp.MustCompile(`(?i)\bis a marketing\b`),
+	regexp.MustCompile(`(?i)\bis the (general )?(home|blog|tech blog|status) ?page\b`),
+	regexp.MustCompile(`(?i)\bis a placeholder\b`),
+	regexp.MustCompile(`(?i)\bis a status page (for|of)\b`),
+	regexp.MustCompile(`(?i)\bin raw pdf format\b`),
+	regexp.MustCompile(`(?i)\bwayback machine capture metadata\b`),
+	regexp.MustCompile(`(?i)\bdomain is for sale\b`),
+	regexp.MustCompile(`(?i)\bredirecting\.?\.?\.?$`),
+	regexp.MustCompile(`(?i)\b(captcha|cloudflare challenge|browser verification)\b`),
+}
+
+// looksLikeJunkDescription reports whether s reads like an "LLM had no
+// useful source" disclaimer rather than an actual incident write-up.
+func looksLikeJunkDescription(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	for _, re := range junkDescriptionPatterns {
 		if re.MatchString(s) {
 			return true
 		}
@@ -202,8 +248,7 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	res.UsedArchive = fr.UsedArchive
 
 	page := ExtractMetadata(fr.RawHTML)
-
-	llmOut, err := opts.LLM.Enrich(ctx, EnrichInput{
+	llmIn := EnrichInput{
 		URL:         pm.URL,
 		Company:     pm.Company,
 		Existing:    pm,
@@ -211,14 +256,48 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		PageDate:    page.PublishedAt,
 		PageText:    page.PlainText,
 		UsedArchive: fr.UsedArchive,
-	})
+	}
+	llmOut, err := opts.LLM.Enrich(ctx, llmIn)
 	if err != nil {
 		res.Err = fmt.Errorf("llm: %w", err)
 		res.Changed = preChanged
 		flushSave(pm, opts, &res, preChanged)
 		return res
 	}
+
+	// If the live page produced a "no useful content" answer but
+	// Wayback has a snapshot, retry with the archive. This recovers
+	// status-page chrome, captcha walls, "domain for sale" parking
+	// pages, and similar dead-but-200 origins.
+	if looksLikeJunkDescription(llmOut.ExpandedDescription) && !fr.UsedArchive && fr.ArchiveURL != "" && fr.ArchiveURL != pm.URL {
+		archiveHTML, _, archiveErr := fetcher.GetRaw(ctx, fr.ArchiveURL)
+		if archiveErr == nil && strings.TrimSpace(archiveHTML) != "" {
+			page2 := ExtractMetadata(archiveHTML)
+			if strings.TrimSpace(page2.PlainText) != "" {
+				llmIn2 := llmIn
+				llmIn2.PageTitle = page2.Title
+				llmIn2.PageDate = page2.PublishedAt
+				llmIn2.PageText = page2.PlainText
+				llmIn2.UsedArchive = true
+				llmOut2, err2 := opts.LLM.Enrich(ctx, llmIn2)
+				if err2 == nil && !looksLikeJunkDescription(llmOut2.ExpandedDescription) {
+					page = page2
+					llmOut = llmOut2
+					fr.UsedArchive = true
+					fr.RawHTML = archiveHTML
+					res.UsedArchive = true
+				}
+			}
+		}
+	}
 	res.Confidence = llmOut.Confidence
+
+	// If the LLM still can't produce a real description, treat the
+	// whole structured response as empty so we don't pollute fields
+	// with "the article text is..." placeholders.
+	if looksLikeJunkDescription(llmOut.ExpandedDescription) {
+		llmOut = EnrichOutput{Confidence: llmOut.Confidence, Notes: llmOut.Notes}
+	}
 
 	changed := mergeEnrichment(pm, fr, page, llmOut, opts)
 	for _, c := range preChanged {
