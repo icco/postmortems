@@ -25,6 +25,11 @@ validate    Validate the postmortem files in the directory.
 serve       Serve the postmortem files in a small website.
 ```
 
+## Design docs
+
+- [Search](docs/search.md) — design proposal for adding free-text
+  search to the site (tracked in [#9](https://github.com/icco/postmortems/issues/9)).
+
 ## Contributing
 
 Edit a file under `data/` or open an issue.
