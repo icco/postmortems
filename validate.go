@@ -66,6 +66,11 @@ func ValidateFile(filename string) (*Postmortem, error) {
 		}
 	}
 
+	if !p.StartTime.IsZero() && !p.EndTime.IsZero() && p.EndTime.Before(p.StartTime) {
+		return nil, fmt.Errorf("%s: end_time %s is before start_time %s", filename, p.EndTime, p.StartTime)
+	}
+
+
 	if p.Description == "" {
 		return nil, fmt.Errorf("%s: description is empty", filename)
 	}
