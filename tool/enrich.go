@@ -15,11 +15,10 @@ import (
 	"github.com/icco/postmortems"
 )
 
-// badTitlePatterns marks page-title scrapes that aren't actually
-// describing the postmortem (status-page chrome, archive wrappers,
-// captcha walls, generic blog/help-center landings). These get treated
-// as empty so the LLM/page-title pipeline can replace them on the next
-// enrich pass.
+// badTitlePatterns matches page-chrome titles (status pages, archive
+// wrappers, captcha walls, blog/help-center landings, bare domains)
+// that aren't real incident titles. See README "How enrich handles
+// junk pages".
 var badTitlePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)^(.{1,30}\s)?status$`),
 	regexp.MustCompile(`(?i)^.{1,30} status page$`),
@@ -58,11 +57,9 @@ func isBadTitle(s string) bool {
 	return false
 }
 
-// junkDescriptionPatterns match the standard "I had nothing to work
-// with" disclaimers Gemini emits when the page text is a homepage,
-// status-page chrome, paywall, captcha, raw PDF, redirect notice, etc.
-// We use the description as a signal that the LLM judged the source
-// useless and discard the entire LLM result rather than persist it.
+// junkDescriptionPatterns matches Gemini's "I had nothing to work with"
+// disclaimers. A match means we discard the whole LLM result rather
+// than persist it. See README "How enrich handles junk pages".
 var junkDescriptionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bthe (provided|given) (article )?(text|content|source)\b`),
 	regexp.MustCompile(`(?i)\bdoes not contain (any )?(specific )?(details|information|content)\b`),
@@ -87,11 +84,9 @@ var junkDescriptionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bis not (available|present|detailed) (from|in) the (provided|given|article)\b`),
 }
 
-// titleFromPage reports whether a stored title looks like it came from
-// the current page's <title> tag. We accept exact, case-insensitive,
-// substring, or "page title is a longer dressed-up version of the
-// stored title" matches because page extractors and CMSes often append
-// site suffixes like " | Acme" or strip them depending on the run.
+// titleFromPage reports whether stored looks like it was scraped from
+// page's <title>. Loose match (case-insensitive, either side may be
+// substring) tolerates site suffixes like " | Acme" that come and go.
 func titleFromPage(stored, page string) bool {
 	stored = strings.TrimSpace(stored)
 	page = strings.TrimSpace(page)
@@ -266,14 +261,11 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		return res
 	}
 
-	// Pre-fetch normalisation. These edits must persist even if the
-	// subsequent fetch or LLM call fails so the file isn't left in a
-	// known-bad state.
+	// Pre-fetch cleanups. These get persisted via flushSave even when
+	// the fetch or LLM call later fails.
 	var preChanged []string
 
-	// If the source URL itself is a Wayback snapshot, swap it for the
-	// origin and stash the snapshot in archive_url so the file no
-	// longer points at the wrapper page.
+	// Unwrap a Wayback snapshot stored in url: into url + archive_url.
 	if origin, snapshot, ok := ParseWaybackURL(pm.URL); ok {
 		pm.URL = origin
 		preChanged = append(preChanged, "url")
@@ -284,12 +276,9 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		res.URL = origin
 	}
 
-	// Revert any existing junk LLM description (an "I had nothing to
-	// work with" placeholder from an earlier enrich pass). The
-	// original blurb was preserved in summary, so we restore it. We
-	// also drop the title and keywords picked from that bad pass —
-	// they came from page chrome (status pages, blog indexes, archive
-	// landings) rather than the actual postmortem.
+	// Roll back a previous junk LLM pass: restore the original blurb
+	// from summary and drop the title/keywords it scraped from page
+	// chrome.
 	if looksLikeJunkDescription(pm.Description) && strings.TrimSpace(pm.Summary) != "" {
 		pm.Description = pm.Summary + "\n"
 		pm.Summary = ""
@@ -331,10 +320,8 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		return res
 	}
 
-	// If the live page produced a "no useful content" answer but
-	// Wayback has a snapshot, retry with the archive. This recovers
-	// status-page chrome, captcha walls, "domain for sale" parking
-	// pages, and similar dead-but-200 origins.
+	// Origin is dead-but-200 (status page, captcha, parking, rebrand):
+	// retry once via the Wayback snapshot.
 	if looksLikeJunkDescription(llmOut.ExpandedDescription) && !fr.UsedArchive && fr.ArchiveURL != "" && fr.ArchiveURL != pm.URL {
 		archiveHTML, _, archiveErr := fetcher.GetRaw(ctx, fr.ArchiveURL)
 		if archiveErr == nil && strings.TrimSpace(archiveHTML) != "" {
@@ -358,16 +345,9 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	}
 	res.Confidence = llmOut.Confidence
 
-	// If the LLM still can't produce a real description, treat the
-	// whole structured response as empty so we don't pollute fields
-	// with "the article text is..." placeholders. We also drop the
-	// page metadata (title, dates) and wipe any existing pm.Title
-	// that originated from the same useless page.
+	// Still junk after retry: drop the LLM result, drop page metadata,
+	// and wipe a stored title that obviously came from this same page.
 	if looksLikeJunkDescription(llmOut.ExpandedDescription) {
-		// The LLM judged the source useless, so any title scraped from
-		// the same page is presumed page chrome rather than a real
-		// incident title. Wipe pm.Title when it likely came from this
-		// source.
 		if pm.Title != "" && titleFromPage(pm.Title, page.Title) {
 			pm.Title = ""
 			preChanged = appendUnique(preChanged, "title")
