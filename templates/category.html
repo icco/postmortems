@@ -3,11 +3,11 @@
 {{define "body"}}
 <section class="max-w-6xl mx-auto px-4 py-8">
 
-  <div class="text-sm breadcrumbs text-base-content/60 mb-3">
+  <div class="text-sm breadcrumbs text-base-content/60 mb-3 max-w-full overflow-x-auto">
     <ul>
       <li><a href="/" class="link link-hover">Index</a></li>
       <li>Categories</li>
-      <li class="capitalize">{{ .Category }}</li>
+      <li class="capitalize truncate max-w-[16ch] sm:max-w-none">{{ .Category }}</li>
     </ul>
   </div>
 
@@ -28,38 +28,38 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-6">
         <div class="stats border border-base-300 bg-base-200/40">
-          <div class="stat py-3 px-4">
+          <div class="stat py-2 px-3 sm:py-3 sm:px-4">
             <div class="stat-title text-xs">Postmortems</div>
-            <div class="stat-value text-2xl">{{ len .Postmortems }}</div>
+            <div class="stat-value text-xl sm:text-2xl">{{ len .Postmortems }}</div>
           </div>
         </div>
         <div class="stats border border-base-300 bg-base-200/40">
-          <div class="stat py-3 px-4">
+          <div class="stat py-2 px-3 sm:py-3 sm:px-4">
             <div class="stat-title text-xs">Companies</div>
-            <div class="stat-value text-2xl">{{ .TotalCompanies }}</div>
+            <div class="stat-value text-xl sm:text-2xl">{{ .TotalCompanies }}</div>
           </div>
         </div>
         <div class="stats border border-base-300 bg-base-200/40">
-          <div class="stat py-3 px-4">
+          <div class="stat py-2 px-3 sm:py-3 sm:px-4">
             <div class="stat-title text-xs">Years covered</div>
-            <div class="stat-value text-2xl">{{ if .SpanYears }}{{ .SpanYears }}{{ else }}&mdash;{{ end }}</div>
+            <div class="stat-value text-xl sm:text-2xl">{{ if .SpanYears }}{{ .SpanYears }}{{ else }}&mdash;{{ end }}</div>
           </div>
         </div>
         <div class="stats border border-base-300 bg-base-200/40">
-          <div class="stat py-3 px-4">
+          <div class="stat py-2 px-3 sm:py-3 sm:px-4">
             <div class="stat-title text-xs">Date range</div>
-            <div class="stat-value text-base font-mono">{{ if .DateRange }}{{ .DateRange }}{{ else }}&mdash;{{ end }}</div>
+            <div class="stat-value text-sm sm:text-base font-mono whitespace-normal break-words leading-tight">{{ if .DateRange }}{{ .DateRange }}{{ else }}&mdash;{{ end }}</div>
           </div>
         </div>
       </div>
     </div>
   </header>
 
-  <div class="grid grid-cols-1 lg:grid-cols-[1fr_18rem] gap-6 items-start">
+  <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem] gap-6 items-start">
 
-    <div class="card bg-base-100 border border-base-300 shadow-sm order-2 lg:order-1">
+    <div class="card bg-base-100 border border-base-300 shadow-sm order-2 lg:order-1 min-w-0">
       <div class="card-body p-0">
         {{ if .Postmortems }}
         <div class="overflow-x-auto">

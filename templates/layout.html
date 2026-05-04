@@ -50,11 +50,11 @@
 <body class="min-h-screen flex flex-col bg-base-200 text-base-content font-sans">
 
   <header class="bg-base-100 border-b border-base-300">
-    <div class="max-w-6xl mx-auto px-4 pt-10 pb-6 text-center">
+    <div class="max-w-6xl mx-auto px-4 pt-8 sm:pt-10 pb-5 sm:pb-6 text-center">
       <a href="/" class="inline-block">
-        <h1 class="text-4xl md:text-5xl font-light italic tracking-tight">Postmortem Index</h1>
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-light italic tracking-tight">Postmortem Index</h1>
       </a>
-      <p class="mt-3 text-xs md:text-sm uppercase tracking-[0.25em] text-base-content/60">
+      <p class="mt-3 text-[0.65rem] sm:text-xs md:text-sm uppercase tracking-[0.2em] sm:tracking-[0.25em] text-base-content/60">
         Explore incident reports from various companies
       </p>
     </div>
@@ -63,9 +63,12 @@
         <li><a href="/" class="rounded-md">Home</a></li>
         <li><a href="/about" class="rounded-md">About</a></li>
         <li>
-          <details>
+          {{- /* dropdown-end keeps the Categories panel anchored to the
+               summary's right edge so it never spills past the viewport
+               on narrow phones. */ -}}
+          <details class="dropdown dropdown-end">
             <summary class="rounded-md">Categories</summary>
-            <ul class="bg-base-100 rounded-box shadow-md p-2 z-10 min-w-[14rem]">
+            <ul class="dropdown-content bg-base-100 rounded-box shadow-md p-2 z-10 w-56 max-h-80 overflow-y-auto">
               {{ range .Categories }}
               <li><a href="/category/{{ . }}" class="capitalize">{{ . }}</a></li>
               {{end}}
