@@ -62,7 +62,7 @@ Long enriched body.
 	}
 
 	// Existing file: untouched.
-	got, err := os.ReadFile(existingPath)
+	got, err := os.ReadFile(existingPath) // #nosec G304 -- path is t.TempDir() in tests
 	if err != nil {
 		t.Fatalf("read existing: %v", err)
 	}
