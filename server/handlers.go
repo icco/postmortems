@@ -221,11 +221,11 @@ func LoadPostmortems(dir string) ([]*postmortems.Postmortem, error) {
 // templateFuncs are made available to every template parsed by
 // renderTemplate.
 var templateFuncs = template.FuncMap{
-	"companySlug":    CompanySlug,
-	"categoryDesc":   describeCategory,
-	"categoryEmoji":  categoryEmoji,
-	"prettifyText":   prettifyText,
-	"firstNonEmpty":  firstNonEmpty,
+	"companySlug":   CompanySlug,
+	"categoryDesc":  describeCategory,
+	"categoryEmoji": categoryEmoji,
+	"prettifyText":  prettifyText,
+	"firstNonEmpty": firstNonEmpty,
 }
 
 // renderTemplate parses layout.html + view and writes the response.
