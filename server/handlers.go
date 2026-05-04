@@ -35,6 +35,7 @@ type Options struct {
 type postmortemView struct {
 	UUID            string
 	URL             string
+	Title           string
 	Company         string
 	Product         string
 	Categories      []string
@@ -47,6 +48,7 @@ func toView(pm *postmortems.Postmortem) postmortemView {
 	return postmortemView{
 		UUID:            pm.UUID,
 		URL:             pm.URL,
+		Title:           pm.Title,
 		Company:         pm.Company,
 		Product:         pm.Product,
 		Categories:      pm.Categories,

@@ -24,6 +24,7 @@ import (
 type Postmortem struct {
 	UUID        string    `yaml:"uuid"`
 	URL         string    `yaml:"url"`
+	Title       string    `yaml:"title,omitempty"`
 	StartTime   time.Time `yaml:"start_time,omitempty"`
 	EndTime     time.Time `yaml:"end_time,omitempty"`
 	Categories  []string  `yaml:"categories"`
@@ -139,6 +140,10 @@ func Parse(f io.Reader) (*Postmortem, error) {
 
 	if url, ok := fm["url"].(string); ok {
 		p.URL = url
+	}
+
+	if title, ok := fm["title"].(string); ok {
+		p.Title = title
 	}
 
 	if company, ok := fm["company"].(string); ok {

@@ -83,6 +83,32 @@ Example body.
 	}
 }
 
+func TestParseTitle(t *testing.T) {
+	t.Parallel()
+
+	const body = `---
+uuid: "abc"
+url: "https://example.com/postmortem"
+title: "Example outage of 2024"
+company: "Example Inc"
+categories:
+- postmortem
+
+---
+
+Example body.
+`
+
+	got, err := Parse(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got.Title != "Example outage of 2024" {
+		t.Errorf("Title = %q, want %q", got.Title, "Example outage of 2024")
+	}
+}
+
+
 func TestEventDatePeriod(t *testing.T) {
 	t.Parallel()
 
