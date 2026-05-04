@@ -324,6 +324,57 @@ Body for ` + id + `.
 	}
 }
 
+func TestEnrich_RewritesWaybackURL(t *testing.T) {
+	t.Parallel()
+
+	origin := httptest.NewServer(originHandler(sampleHTML))
+	t.Cleanup(origin.Close)
+
+	dir := t.TempDir()
+	uuid := "44444444-4444-4444-4444-444444444444"
+	wayback := "https://web.archive.org/web/20220101000000/" + origin.URL + "/post"
+	body := `---
+uuid: "` + uuid + `"
+url: "` + wayback + `"
+categories:
+- postmortem
+company: "ExampleCo"
+
+---
+
+A short blurb.
+`
+	fp := filepath.Join(dir, uuid+".md")
+	if err := os.WriteFile(fp, []byte(body), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	llm := &fakeLLM{resp: EnrichOutput{Confidence: "low"}}
+	res, err := EnrichPostmortems(context.Background(), enrichOptions{
+		Dir: dir, Apply: true, HTTPTimeout: 5 * time.Second, LLM: llm, Concurrency: 1,
+	})
+	if err != nil {
+		t.Fatalf("Enrich: %v", err)
+	}
+	if len(res) != 1 || res[0].Err != nil {
+		t.Fatalf("res = %+v", res)
+	}
+
+	pm := readPM(t, fp)
+	wantOrigin := origin.URL + "/post"
+	if pm.URL != wantOrigin {
+		t.Errorf("pm.URL = %q, want %q", pm.URL, wantOrigin)
+	}
+	wantArchive := "https://web.archive.org/web/20220101000000if_/" + origin.URL + "/post"
+	if pm.ArchiveURL != wantArchive {
+		t.Errorf("pm.ArchiveURL = %q, want %q", pm.ArchiveURL, wantArchive)
+	}
+	gotChanged := strings.Join(res[0].Changed, ",")
+	if !strings.Contains(gotChanged, "url") || !strings.Contains(gotChanged, "archive_url") {
+		t.Errorf("expected url and archive_url in changed list: %s", gotChanged)
+	}
+}
+
 func TestIsBadTitle(t *testing.T) {
 	t.Parallel()
 	bad := []string{

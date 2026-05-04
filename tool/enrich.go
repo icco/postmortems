@@ -177,6 +177,15 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		return res
 	}
 
+	originalURL, originalArchive := pm.URL, pm.ArchiveURL
+	if origin, snapshot, ok := ParseWaybackURL(pm.URL); ok {
+		pm.URL = origin
+		if pm.ArchiveURL == "" {
+			pm.ArchiveURL = snapshot
+		}
+		res.URL = origin
+	}
+
 	fr, err := fetcher.Fetch(ctx, pm.URL)
 	if err != nil {
 		res.Err = fmt.Errorf("fetch: %w", err)
@@ -202,6 +211,23 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	res.Confidence = llmOut.Confidence
 
 	changed := mergeEnrichment(pm, fr, page, llmOut, opts)
+	if pm.URL != originalURL {
+		changed = append(changed, "url")
+	}
+	if pm.ArchiveURL != originalArchive {
+		// May already be in changed via mergeEnrichment's fr.ArchiveURL
+		// branch; dedupe to avoid double-listing.
+		found := false
+		for _, c := range changed {
+			if c == "archive_url" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			changed = append(changed, "archive_url")
+		}
+	}
 	res.Changed = changed
 
 	if !opts.Apply || len(changed) == 0 {
