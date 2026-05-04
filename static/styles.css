@@ -355,6 +355,19 @@ ul {
     }
 }
 
+.sortable-th {
+    user-select: none;
+}
+
+.sortable-th:hover {
+    background-color: #f6f6f6;
+}
+
+.sort-arrow {
+    color: #666;
+    font-size: .75rem;
+}
+
 .keyword {
     display: inline-block;
     background-color: #f0f0f0;
