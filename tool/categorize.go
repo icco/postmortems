@@ -15,6 +15,19 @@ import (
 	"github.com/icco/postmortems"
 )
 
+// Category names used by both the matcher map and tests. Mirrors the
+// strings in postmortems.Categories.
+const (
+	catAutomation       = "automation"
+	catCascadingFailure = "cascading-failure"
+	catCloud            = "cloud"
+	catConfigChange     = "config-change"
+	catHardware         = "hardware"
+	catSecurity         = "security"
+	catTime             = "time"
+	catPostmortem       = "postmortem"
+)
+
 // categoryPatterns maps a category name in postmortems.Categories to a
 // set of case-insensitive regular expressions. If any pattern matches
 // the body of a postmortem's source URL the category is suggested.
@@ -23,17 +36,17 @@ import (
 // "undescriptive" (a subjective judgement that should not be
 // auto-applied).
 var categoryPatterns = map[string][]*regexp.Regexp{
-	"automation": {
+	catAutomation: {
 		mustRegex(`\bautomation\b`),
 		mustRegex(`\bautomated\b`),
 		mustRegex(`\bauto[- ]?scaling\b`),
 	},
-	"cascading-failure": {
+	catCascadingFailure: {
 		mustRegex(`\bcascad(e|ing)\b`),
 		mustRegex(`\bdomino\b`),
 		mustRegex(`\bthundering herd\b`),
 	},
-	"cloud": {
+	catCloud: {
 		mustRegex(`\baws\b`),
 		mustRegex(`\bamazon web services\b`),
 		mustRegex(`\bgcp\b`),
@@ -44,14 +57,14 @@ var categoryPatterns = map[string][]*regexp.Regexp{
 		mustRegex(`\bkubernetes\b`),
 		mustRegex(`\bcloud provider\b`),
 	},
-	"config-change": {
+	catConfigChange: {
 		mustRegex(`\bconfig(uration)? change\b`),
 		mustRegex(`\bbad config\b`),
 		mustRegex(`\bmisconfigur(ation|ed)\b`),
 		mustRegex(`\bdeploy(ment)?\b`),
 		mustRegex(`\brollout\b`),
 	},
-	"hardware": {
+	catHardware: {
 		mustRegex(`\bhardware (failure|fault|issue)\b`),
 		mustRegex(`\bdisk (failure|fault|fail)\b`),
 		mustRegex(`\bssd (failure|fault)\b`),
@@ -60,7 +73,7 @@ var categoryPatterns = map[string][]*regexp.Regexp{
 		mustRegex(`\bpower (failure|outage|loss)\b`),
 		mustRegex(`\bdata ?cent(re|er) (failure|outage)\b`),
 	},
-	"security": {
+	catSecurity: {
 		mustRegex(`\bsecurity (incident|breach|advisory)\b`),
 		mustRegex(`\bvulnerab(le|ility)\b`),
 		mustRegex(`\bexploit(ed|ation)?\b`),
@@ -68,7 +81,7 @@ var categoryPatterns = map[string][]*regexp.Regexp{
 		mustRegex(`\bleaked? credential\b`),
 		mustRegex(`\bcve-\d{4}-\d+`),
 	},
-	"time": {
+	catTime: {
 		mustRegex(`\bntp\b`),
 		mustRegex(`\btimezone\b`),
 		mustRegex(`\bleap second\b`),
@@ -298,13 +311,15 @@ func contains(s []string, v string) bool {
 }
 
 // printCategorizeReport writes a human-readable summary of res to w.
+// Write errors on a CLI report writer are not actionable, so they are
+// intentionally ignored.
 func printCategorizeReport(w io.Writer, res []categorizeResult, apply bool) {
 	var changed, fetchErrs, total int
 	for _, r := range res {
 		total++
 		if r.Err != nil {
 			fetchErrs++
-			fmt.Fprintf(w, "ERR  %s (%s): %v\n", filepath.Base(r.Path), r.URL, r.Err)
+			_, _ = fmt.Fprintf(w, "ERR  %s (%s): %v\n", filepath.Base(r.Path), r.URL, r.Err)
 			continue
 		}
 		if len(r.Suggestions) == 0 {
@@ -315,7 +330,7 @@ func printCategorizeReport(w io.Writer, res []categorizeResult, apply bool) {
 		if apply {
 			marker = "APPLIED"
 		}
-		fmt.Fprintf(w, "%s %s -> %v\n", marker, filepath.Base(r.Path), r.Suggestions)
+		_, _ = fmt.Fprintf(w, "%s %s -> %v\n", marker, filepath.Base(r.Path), r.Suggestions)
 	}
-	fmt.Fprintf(w, "\nprocessed=%d  with-suggestions=%d  fetch-errors=%d\n", total, changed, fetchErrs)
+	_, _ = fmt.Fprintf(w, "\nprocessed=%d  with-suggestions=%d  fetch-errors=%d\n", total, changed, fetchErrs)
 }

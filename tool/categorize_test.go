@@ -15,26 +15,26 @@ func TestMatchCategories(t *testing.T) {
 		{
 			name:     "cloud and config",
 			body:     "We rolled out a bad config to our AWS EC2 fleet.",
-			existing: []string{"postmortem"},
-			want:     []string{"cloud", "config-change"},
+			existing: []string{catPostmortem},
+			want:     []string{catCloud, catConfigChange},
 		},
 		{
 			name:     "skip already-present categories",
 			body:     "Cascading failure across the cluster after a misconfiguration.",
-			existing: []string{"postmortem", "cascading-failure"},
-			want:     []string{"config-change"},
+			existing: []string{catPostmortem, catCascadingFailure},
+			want:     []string{catConfigChange},
 		},
 		{
 			name:     "no matches",
 			body:     "Nothing in this body should trigger anything.",
-			existing: []string{"postmortem"},
+			existing: []string{catPostmortem},
 			want:     nil,
 		},
 		{
 			name:     "ntp triggers time",
 			body:     "An NTP misconfiguration confused our log timestamps.",
-			existing: []string{"postmortem"},
-			want:     []string{"config-change", "time"},
+			existing: []string{catPostmortem},
+			want:     []string{catConfigChange, catTime},
 		},
 	}
 
@@ -52,14 +52,14 @@ func TestMatchCategories(t *testing.T) {
 
 func TestMergeCategories(t *testing.T) {
 	// Order is the declaration order in postmortems.Categories.
-	got := mergeCategories([]string{"postmortem"}, []string{"cloud", "config-change"})
-	want := []string{"cloud", "config-change", "postmortem"}
+	got := mergeCategories([]string{catPostmortem}, []string{catCloud, catConfigChange})
+	want := []string{catCloud, catConfigChange, catPostmortem}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("mergeCategories() = %v, want %v", got, want)
 	}
 
-	got = mergeCategories([]string{"postmortem", "hardware"}, []string{"hardware", "cloud"})
-	want = []string{"cloud", "postmortem", "hardware"}
+	got = mergeCategories([]string{catPostmortem, catHardware}, []string{catHardware, catCloud})
+	want = []string{catCloud, catPostmortem, catHardware}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("mergeCategories() with overlap = %v, want %v", got, want)
 	}
