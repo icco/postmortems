@@ -1,10 +1,12 @@
 ---
 uuid: 7e14860a-fced-4a66-9fdf-40f702ceeccd
 url: https://status.heroku.com/incidents/642?postmortem
+title: Heroku Status
 categories:
 - postmortem
 company: Heroku
 product: ""
+source_fetched_at: 2026-05-04T17:49:55.984089Z
 
 ---
 
