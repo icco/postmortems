@@ -18,8 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// TestMetricsEndpoint asserts otelhttp's HTTP server histogram lands
-// on /metrics tagged with the chi route pattern.
+// TestMetricsEndpoint asserts the chi route pattern is tagged onto otelhttp metrics.
 func TestMetricsEndpoint(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	exporter, err := otelprom.New(otelprom.WithRegisterer(reg))
@@ -226,15 +225,9 @@ func TestLoadPostmortems(t *testing.T) {
 	}
 }
 
-// TestPageMetaTags spins up the full router against the testdata
-// directory and asserts that each route emits a unique, route-specific
-// canonical URL plus the matching Open Graph + Twitter Card metadata.
-// This is the regression test for issue: every page used to share
-// the hardcoded https://postmortems.app/ canonical/og:url.
+// TestPageMetaTags asserts each route emits a unique canonical URL plus
+// matching Open Graph and Twitter Card tags.
 func TestPageMetaTags(t *testing.T) {
-	// Templates and the testdata folder are referenced relative to
-	// the project root; t.Chdir restores the original cwd at end of
-	// test for any sibling tests that depend on it.
 	t.Chdir("..")
 
 	h := New(Options{
@@ -263,8 +256,6 @@ func TestPageMetaTags(t *testing.T) {
 		return resp.StatusCode, string(body)
 	}
 
-	// /about: every meta tag should anchor to /about, not /, and
-	// should match the about-page OG title/description we set.
 	t.Run("about", func(t *testing.T) {
 		status, body := get("/about")
 		if status != http.StatusOK {
@@ -279,9 +270,6 @@ func TestPageMetaTags(t *testing.T) {
 		})
 	})
 
-	// /postmortem/{id}: must use og:type=article, the postmortem-
-	// specific title (Company name, since the test fixture has no
-	// Title set), and a canonical URL that includes the UUID.
 	t.Run("postmortem", func(t *testing.T) {
 		path := "/postmortem/" + testUUID
 		status, body := get(path)
@@ -292,16 +280,12 @@ func TestPageMetaTags(t *testing.T) {
 			`<meta property="og:type" content="article">`,
 			`<meta property="og:url" content="https://postmortems.app/postmortem/` + testUUID + `">`,
 			`<link rel="canonical" href="https://postmortems.app/postmortem/` + testUUID + `">`,
-			// Test fixture has no Title, so og:title falls
-			// back to the company-postmortem combo.
 			`<meta property="og:title" content="CCP Games postmortem">`,
 		})
 	})
 }
 
-// mustContain fails the test with a single grouped error if any of the
-// wanted needles are missing, so a flake on one tag still surfaces the
-// others without re-running.
+// mustContain fails the test if any needle is missing, surfacing all gaps at once.
 func mustContain(t *testing.T, body string, needles []string) {
 	t.Helper()
 	var missing []string
@@ -315,9 +299,7 @@ func mustContain(t *testing.T, body string, needles []string) {
 	}
 }
 
-// TestAbsURL covers the path-normalisation behaviour the layout.html
-// canonical/og:url builders rely on (empty -> "/", missing leading
-// slash -> added, already-absolute path -> unchanged).
+// TestAbsURL covers path normalisation for canonical/og:url builders.
 func TestAbsURL(t *testing.T) {
 	cases := []struct {
 		in, want string
@@ -335,9 +317,7 @@ func TestAbsURL(t *testing.T) {
 	}
 }
 
-// TestSummarizeMarkdown ensures the OG-description helper strips
-// Markdown link/emphasis syntax and truncates on a word boundary so
-// embeds never display "*foo*" or a mid-word cut.
+// TestSummarizeMarkdown verifies OG descriptions strip Markdown and cut on a word boundary.
 func TestSummarizeMarkdown(t *testing.T) {
 	cases := []struct {
 		name string
