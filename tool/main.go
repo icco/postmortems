@@ -35,6 +35,10 @@ var (
 			Validate: survey.ComposeValidators(survey.Required, IsURL()),
 		},
 		{
+			Name:   "title",
+			Prompt: &survey.Input{Message: "Title (optional, e.g. \"AWS S3 outage of 2017\")?"},
+		},
+		{
 			Name:      "company",
 			Prompt:    &survey.Input{Message: "Company?"},
 			Validate:  survey.Required,
