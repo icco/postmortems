@@ -102,9 +102,22 @@ func ExtractPostmortems(loc string, dir string) (*ImportReport, error) {
 			continue
 		}
 
+		// If the upstream URL is itself a Wayback snapshot, store the
+		// origin URL in `url:` and the snapshot in `archive_url:` from
+		// the start. This matches the post-enrich representation, so
+		// the file shape is the same whether or not the LLM step ever
+		// runs and re-imports stay idempotent.
+		entryURL := rawURL
+		var archiveURL string
+		if origin, snapshot, ok := unwrapWayback(rawURL); ok {
+			entryURL = origin
+			archiveURL = snapshot
+		}
+
 		pm := &Postmortem{
 			UUID:        guuid.New().String(),
-			URL:         rawURL,
+			URL:         entryURL,
+			ArchiveURL:  archiveURL,
 			Company:     company,
 			Description: desc,
 			Categories:  []string{categoryPostmortem},

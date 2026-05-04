@@ -23,6 +23,20 @@ func UnwrapWaybackURL(s string) string {
 	return s
 }
 
+// unwrapWayback splits a Wayback snapshot URL into (origin, snapshot,
+// true). The snapshot is normalised to https + the `if_` flag so a
+// follow-up fetch retrieves the iframe-content view without Wayback
+// chrome. Returns ok=false if s isn't a snapshot URL.
+func unwrapWayback(s string) (origin, snapshot string, ok bool) {
+	s = strings.TrimSpace(s)
+	m := waybackSnapshot.FindStringSubmatch(s)
+	if m == nil {
+		return "", "", false
+	}
+	ts, orig := m[1], m[3]
+	return orig, "https://web.archive.org/web/" + ts + "if_/" + orig, true
+}
+
 // CanonicalURL returns a normalised form of u suitable for equality
 // checks against curated postmortem URLs. The output is not meant to be
 // fetched; it just needs to be stable for the same logical resource.

@@ -7,6 +7,141 @@ import (
 	"testing"
 )
 
+// TestExtractPostmortems_NewWaybackEntryIsPreUnwrapped asserts that a
+// brand-new upstream entry whose URL is a Wayback snapshot lands on
+// disk with the origin URL in `url:` and the snapshot in
+// `archive_url:`, matching the post-enrich representation. Without
+// this, the same entry would canonicalise differently before vs after
+// enrichment and a re-import could miss the match.
+func TestExtractPostmortems_NewWaybackEntryIsPreUnwrapped(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	src := filepath.Join(t.TempDir(), "upstream.md")
+	if err := os.WriteFile(src, []byte(
+		"[Acme](https://web.archive.org/web/20220601000000/https://blog.acme.com/incident). The blurb.\n",
+	), 0o600); err != nil {
+		t.Fatalf("write upstream: %v", err)
+	}
+
+	report, err := ExtractPostmortems(src, dir)
+	if err != nil {
+		t.Fatalf("ExtractPostmortems: %v", err)
+	}
+	if got := len(report.Added); got != 1 {
+		t.Fatalf("Added = %d, want 1", got)
+	}
+	pm := report.Added[0]
+	if got, want := pm.URL, "https://blog.acme.com/incident"; got != want {
+		t.Errorf("URL = %q, want %q (origin should be unwrapped)", got, want)
+	}
+	if got, want := pm.ArchiveURL, "https://web.archive.org/web/20220601000000if_/https://blog.acme.com/incident"; got != want {
+		t.Errorf("ArchiveURL = %q, want %q", got, want)
+	}
+
+	// Re-import the same upstream line: should be a no-op now.
+	report2, err := ExtractPostmortems(src, dir)
+	if err != nil {
+		t.Fatalf("re-import: %v", err)
+	}
+	if len(report2.Added) != 0 {
+		t.Errorf("re-import Added = %d, want 0; pre-unwrap state didn't round-trip",
+			len(report2.Added))
+	}
+	if report2.SkippedExisting != 1 {
+		t.Errorf("re-import SkippedExisting = %d, want 1", report2.SkippedExisting)
+	}
+}
+
+// TestExtractPostmortems_SkipsWhenUpstreamIsArchiveOfExisting verifies
+// that when danluu/post-mortems lists a Wayback snapshot, the import
+// recognises it as the same resource as a local entry that already
+// stores either the origin URL (post-enrich) or a different snapshot
+// in archive_url, and skips it instead of creating a duplicate.
+func TestExtractPostmortems_SkipsWhenUpstreamIsArchiveOfExisting(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	// Case A: existing entry stores origin URL; upstream lists a
+	// Wayback snapshot of that origin.
+	existingA := `---
+uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+url: "https://blog.example.com/outage-2022"
+categories:
+- postmortem
+company: "ExampleCo"
+
+---
+
+Body.
+`
+	if err := os.WriteFile(filepath.Join(dir, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.md"), []byte(existingA), 0o600); err != nil {
+		t.Fatalf("seed A: %v", err)
+	}
+
+	// Case B: existing entry stores a Wayback snapshot in archive_url
+	// (e.g. previous enrich pass) under a different timestamp than the
+	// one upstream uses now.
+	existingB := `---
+uuid: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+url: "https://other.example.com/incident"
+archive_url: "https://web.archive.org/web/20210101000000/https://other.example.com/incident"
+categories:
+- postmortem
+company: "OtherCo"
+
+---
+
+Body.
+`
+	if err := os.WriteFile(filepath.Join(dir, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.md"), []byte(existingB), 0o600); err != nil {
+		t.Fatalf("seed B: %v", err)
+	}
+
+	// Case C: existing entry's URL is itself a Wayback snapshot (not
+	// yet enriched/unwrapped); upstream lists the bare origin.
+	existingC := `---
+uuid: "cccccccc-cccc-cccc-cccc-cccccccccccc"
+url: "https://web.archive.org/web/20180101000000/https://legacy.example.com/postmortem"
+categories:
+- postmortem
+company: "LegacyCo"
+
+---
+
+Body.
+`
+	if err := os.WriteFile(filepath.Join(dir, "cccccccc-cccc-cccc-cccc-cccccccccccc.md"), []byte(existingC), 0o600); err != nil {
+		t.Fatalf("seed C: %v", err)
+	}
+
+	upstream := strings.Join([]string{
+		// matches A: origin known, upstream gives a snapshot
+		"[ExampleCo](https://web.archive.org/web/20220601000000/https://blog.example.com/outage-2022). Same as A.",
+		// matches B: same origin, different Wayback snapshot than archive_url
+		"[OtherCo](https://web.archive.org/web/20240701000000/https://other.example.com/incident). Same as B.",
+		// matches C: existing URL is wayback, upstream gives origin
+		"[LegacyCo](https://legacy.example.com/postmortem). Same as C.",
+	}, "\n")
+	src := filepath.Join(t.TempDir(), "upstream.md")
+	if err := os.WriteFile(src, []byte(upstream), 0o600); err != nil {
+		t.Fatalf("write upstream: %v", err)
+	}
+
+	report, err := ExtractPostmortems(src, dir)
+	if err != nil {
+		t.Fatalf("ExtractPostmortems: %v", err)
+	}
+	if got := len(report.Added); got != 0 {
+		t.Errorf("Added = %d, want 0; ExtractPostmortems treated archive vs origin as different",
+			got)
+	}
+	if report.SkippedExisting != 3 {
+		t.Errorf("SkippedExisting = %d, want 3", report.SkippedExisting)
+	}
+}
+
 // TestExtractPostmortems_AdditiveImport asserts the extractor:
 //   - leaves an existing entry alone when the upstream URL canonicalises
 //     to the same resource (so enriched fields aren't clobbered),
