@@ -3,6 +3,7 @@ package postmortems
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -49,5 +50,30 @@ func TestParse(t *testing.T) {
 				t.Errorf("Parse() returned unexpected results (-got +want):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestParseTitle(t *testing.T) {
+	t.Parallel()
+
+	const body = `---
+uuid: "abc"
+url: "https://example.com/postmortem"
+title: "Example outage of 2024"
+company: "Example Inc"
+categories:
+- postmortem
+
+---
+
+Example body.
+`
+
+	got, err := Parse(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got.Title != "Example outage of 2024" {
+		t.Errorf("Title = %q, want %q", got.Title, "Example outage of 2024")
 	}
 }
