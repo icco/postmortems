@@ -115,10 +115,17 @@ to marketing pages. `enrich` defends the corpus by:
   before the new fetch runs; the cleanups persist even if the fetch
   fails.
 
-Things still needing a hand-edit: dead origin + no Wayback snapshot
-(blurb-only entries), rebrand redirects whose new page reads as a
-coherent product description, and PDF sources (currently fetched as
-bytes and ignored by the HTML extractor).
+Cases that still need a hand-edit:
+
+- **Dead origin + no Wayback snapshot.** When both fetches fail the
+  entry keeps its original blurb in `description` and minimal
+  frontmatter — there's nothing for the LLM to expand.
+- **Rebrand redirects** (e.g. `stackdriver.com` → Google Observability)
+  where the new page reads as a coherent product description, so the
+  junk-description regexes don't catch it. Spot-check and hand-edit
+  when you see one.
+- **PDF sources.** Currently fetched as bytes and ignored by the HTML
+  extractor; worth a follow-up to download and parse text.
 
 ## Contributing
 

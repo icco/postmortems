@@ -339,6 +339,115 @@ Body for ` + id + `.
 	}
 }
 
+// TestEnrich_PrefersArchiveSnapshotNearPublishedAt verifies that a
+// publication date discovered from page metadata triggers a refined
+// Wayback lookup, and the date-targeted snapshot beats the recent one.
+func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
+	t.Parallel()
+
+	origin := httptest.NewServer(originHandler(sampleHTML))
+	t.Cleanup(origin.Close)
+
+	publishedAt := time.Date(2017, 3, 1, 0, 0, 0, 0, time.UTC) // matches sampleHTML
+
+	dir := t.TempDir()
+	fp := writeSampleEntry(t, dir, origin.URL)
+
+	fetcher := fetcherWithMockedWayback(t, func(target, ts string) string {
+		if target != origin.URL {
+			return ""
+		}
+		if ts == publishedAt.Format("20060102") {
+			return "http://web.archive.org/web/20170302000000/" + origin.URL
+		}
+		return "http://web.archive.org/web/20260101000000/" + origin.URL
+	})
+
+	llm := &fakeLLM{resp: EnrichOutput{
+		ExpandedDescription: "An incident description that is clearly not junk.",
+		Confidence:          "high",
+	}}
+	opts := enrichOptions{
+		Dir: dir, Apply: true, HTTPTimeout: 5 * time.Second,
+		LLM: llm, Concurrency: 1,
+	}
+	res := enrichOne(context.Background(), fetcher, opts, fp)
+	if res.Err != nil {
+		t.Fatalf("enrichOne: %v", res.Err)
+	}
+
+	pm := readPM(t, fp)
+	want := "https://web.archive.org/web/20170302000000if_/" + origin.URL
+	if pm.ArchiveURL != want {
+		t.Errorf("pm.ArchiveURL = %q, want date-targeted %q", pm.ArchiveURL, want)
+	}
+}
+
+// TestEnrich_UsesExistingPublishedAtForArchiveLookup verifies that an
+// existing source_published_at seeds the initial Wayback lookup
+// (rather than relying on post-extraction refinement). The mock
+// asserts every availability query carries the expected timestamp.
+func TestEnrich_UsesExistingPublishedAtForArchiveLookup(t *testing.T) {
+	t.Parallel()
+
+	// Strip published_time so the date can only come from frontmatter.
+	html := strings.Replace(
+		sampleHTML,
+		`<meta property="article:published_time" content="2017-03-01T00:00:00Z">`,
+		"", 1,
+	)
+	origin := httptest.NewServer(originHandler(html))
+	t.Cleanup(origin.Close)
+
+	publishedAt := time.Date(2018, 8, 5, 0, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	fp := filepath.Join(dir, "55555555-5555-5555-5555-555555555555.md")
+	body := `---
+uuid: "55555555-5555-5555-5555-555555555555"
+url: "` + origin.URL + `"
+company: "ExampleCo"
+source_published_at: ` + publishedAt.Format(time.RFC3339) + `
+
+---
+
+A short blurb.
+`
+	if err := os.WriteFile(fp, []byte(body), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	wantTS := publishedAt.Format("20060102")
+	fetcher := fetcherWithMockedWayback(t, func(target, ts string) string {
+		if target != origin.URL {
+			return ""
+		}
+		if ts != wantTS {
+			t.Errorf("availability lookup ts = %q, want %q", ts, wantTS)
+			return ""
+		}
+		return "http://web.archive.org/web/20180806000000/" + origin.URL
+	})
+
+	llm := &fakeLLM{resp: EnrichOutput{
+		ExpandedDescription: "An incident description that is clearly not junk.",
+		Confidence:          "high",
+	}}
+	opts := enrichOptions{
+		Dir: dir, Apply: true, HTTPTimeout: 5 * time.Second,
+		LLM: llm, Concurrency: 1,
+	}
+	res := enrichOne(context.Background(), fetcher, opts, fp)
+	if res.Err != nil {
+		t.Fatalf("enrichOne: %v", res.Err)
+	}
+
+	pm := readPM(t, fp)
+	want := "https://web.archive.org/web/20180806000000if_/" + origin.URL
+	if pm.ArchiveURL != want {
+		t.Errorf("pm.ArchiveURL = %q, want %q", pm.ArchiveURL, want)
+	}
+}
+
 func TestEnrich_RewritesWaybackURL(t *testing.T) {
 	t.Parallel()
 

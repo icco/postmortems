@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/icco/postmortems"
@@ -30,13 +30,26 @@ type FetchResult struct {
 	UsedArchive  bool
 }
 
-// Fetcher caches Wayback availability lookups per process so retries
-// don't re-hit archive.org. Build one with NewFetcher.
+const defaultAvailabilityURL = "https://archive.org/wayback/available"
+
+// Fetcher issues source GETs and Wayback availability lookups.
 type Fetcher struct {
 	client *http.Client
 
-	mu    sync.Mutex
-	cache map[string]string // origin URL -> archive snapshot URL ("" = looked up, none available)
+	// AvailabilityURL overrides the Wayback availability endpoint
+	// (used by tests). Empty means defaultAvailabilityURL.
+	AvailabilityURL string
+
+	// Logger receives best-effort failures (e.g. wayback availability
+	// errors that don't abort the surrounding fetch). Nil = slog.Default.
+	Logger *slog.Logger
+}
+
+func (f *Fetcher) logger() *slog.Logger {
+	if f.Logger != nil {
+		return f.Logger
+	}
+	return slog.Default()
 }
 
 // NewFetcher returns a Fetcher with the given client timeout (15s if zero).
@@ -45,14 +58,15 @@ func NewFetcher(timeout time.Duration) *Fetcher {
 		timeout = 15 * time.Second
 	}
 	return &Fetcher{
-		client: &http.Client{Timeout: timeout},
-		cache:  map[string]string{},
+		client:          &http.Client{Timeout: timeout},
+		AvailabilityURL: defaultAvailabilityURL,
 	}
 }
 
 // Fetch GETs rawURL, falling back to the closest Wayback snapshot when
-// the origin fails. ArchiveURL is recorded either way.
-func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (FetchResult, error) {
+// the origin fails. ArchiveURL is recorded either way; when targets the
+// Wayback lookup at a date (zero = most recent snapshot).
+func (f *Fetcher) Fetch(ctx context.Context, rawURL string, when time.Time) (FetchResult, error) {
 	res := FetchResult{
 		OriginURL: rawURL,
 		FetchedAt: time.Now().UTC(),
@@ -61,7 +75,11 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (FetchResult, error)
 		return res, fmt.Errorf("empty url")
 	}
 
-	archive, _ := f.archiveLookup(ctx, rawURL)
+	archive, lookupErr := f.archiveLookup(ctx, rawURL, when)
+	if lookupErr != nil {
+		f.logger().Debug("wayback availability lookup failed",
+			"url", rawURL, "when", when, "err", lookupErr)
+	}
 	res.ArchiveURL = archive
 
 	html, status, originErr := f.get(ctx, rawURL)
@@ -96,6 +114,13 @@ func (f *Fetcher) GetRaw(ctx context.Context, rawURL string) (string, int, error
 	return f.get(ctx, rawURL)
 }
 
+// ArchiveSnapshot returns the Wayback snapshot URL closest to when, or
+// "" if none. Used by the enricher to refine ArchiveURL after a
+// publication date is discovered from the page.
+func (f *Fetcher) ArchiveSnapshot(ctx context.Context, target string, when time.Time) (string, error) {
+	return f.archiveLookup(ctx, target, when)
+}
+
 // get GETs rawURL with the standard user-agent and capped body.
 func (f *Fetcher) get(ctx context.Context, rawURL string) (string, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
@@ -122,26 +147,24 @@ func (f *Fetcher) get(ctx context.Context, rawURL string) (string, int, error) {
 	return string(body), resp.StatusCode, nil
 }
 
-// archiveLookup returns the closest Wayback snapshot URL ("" if none),
-// caching results for the Fetcher's lifetime.
-func (f *Fetcher) archiveLookup(ctx context.Context, target string) (string, error) {
-	f.mu.Lock()
-	if v, ok := f.cache[target]; ok {
-		f.mu.Unlock()
-		return v, nil
+// archiveLookup returns the Wayback snapshot URL closest to when, or
+// "" if none. Zero when = most recent.
+func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Time) (string, error) {
+	endpoint := f.AvailabilityURL
+	if endpoint == "" {
+		endpoint = defaultAvailabilityURL
 	}
-	f.mu.Unlock()
-
 	q := url.Values{"url": []string{target}}
-	endpoint := "https://archive.org/wayback/available?" + q.Encode()
+	if !when.IsZero() {
+		q.Set("timestamp", when.UTC().Format("20060102"))
+	}
+	endpoint += "?" + q.Encode()
 
 	body, status, err := f.get(ctx, endpoint)
 	if err != nil {
-		f.cacheStore(target, "")
 		return "", err
 	}
 	if status != http.StatusOK {
-		f.cacheStore(target, "")
 		return "", fmt.Errorf("wayback availability returned %d", status)
 	}
 
@@ -155,13 +178,11 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string) (string, err
 		} `json:"archived_snapshots"`
 	}
 	if err := json.Unmarshal([]byte(body), &payload); err != nil {
-		f.cacheStore(target, "")
 		return "", fmt.Errorf("parse wayback response: %w", err)
 	}
 
 	snap := payload.ArchivedSnapshots.Closest.URL
 	if snap == "" || !payload.ArchivedSnapshots.Closest.Available {
-		f.cacheStore(target, "")
 		return "", nil
 	}
 
@@ -176,12 +197,5 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string) (string, err
 	if _, ifSnap, ok := postmortems.ParseWaybackURL(snap); ok {
 		snap = ifSnap
 	}
-	f.cacheStore(target, snap)
 	return snap, nil
-}
-
-func (f *Fetcher) cacheStore(key, val string) {
-	f.mu.Lock()
-	f.cache[key] = val
-	f.mu.Unlock()
 }

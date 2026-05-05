@@ -236,6 +236,7 @@ func EnrichPostmortems(ctx context.Context, opts enrichOptions) ([]enrichResult,
 	opts.Logger.Info("enrich starting", "files", total, "workers", opts.Concurrency, "apply", opts.Apply)
 
 	fetcher := NewFetcher(opts.HTTPTimeout)
+	fetcher.Logger = opts.Logger
 
 	jobs := make(chan string)
 	results := make(chan enrichResult)
@@ -328,7 +329,11 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		}
 	}
 
-	fr, err := fetcher.Fetch(ctx, pm.URL)
+	// Target the Wayback lookup at the publication date so archive_url
+	// captures the page near when it was published. Refine below if
+	// the page reveals a date we didn't have on disk.
+	initialWhen := pm.SourcePublishedAt
+	fr, err := fetcher.Fetch(ctx, pm.URL, initialWhen)
 	if err != nil {
 		res.Err = fmt.Errorf("fetch: %w", err)
 		res.Changed = preChanged
@@ -338,6 +343,16 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	res.UsedArchive = fr.UsedArchive
 
 	page := ExtractMetadata(fr.RawHTML)
+
+	if initialWhen.IsZero() && !page.PublishedAt.IsZero() {
+		switch snap, err := fetcher.ArchiveSnapshot(ctx, pm.URL, page.PublishedAt); {
+		case err != nil:
+			opts.Logger.Debug("archive_url refinement failed",
+				"url", pm.URL, "when", page.PublishedAt, "err", err)
+		case snap != "":
+			fr.ArchiveURL = snap
+		}
+	}
 	llmIn := EnrichInput{
 		URL:         pm.URL,
 		Company:     pm.Company,
