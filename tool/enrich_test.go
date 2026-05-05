@@ -339,9 +339,7 @@ Body for ` + id + `.
 	}
 }
 
-// TestEnrich_PrefersArchiveSnapshotNearPublishedAt verifies that a
-// publication date discovered from page metadata triggers a refined
-// Wayback lookup, and the date-targeted snapshot beats the recent one.
+// A page-derived publication date should trigger a refined CDX lookup.
 func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
 	t.Parallel()
 
@@ -383,14 +381,11 @@ func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
 	}
 }
 
-// TestEnrich_UsesExistingPublishedAtForArchiveLookup verifies that an
-// existing source_published_at seeds the initial Wayback lookup
-// (rather than relying on post-extraction refinement). The mock
-// asserts every CDX query carries the expected closest=YYYYMMDD.
+// A frontmatter source_published_at should seed the initial CDX lookup.
 func TestEnrich_UsesExistingPublishedAtForArchiveLookup(t *testing.T) {
 	t.Parallel()
 
-	// Strip published_time so the date can only come from frontmatter.
+	// Strip the meta tag so the date can only come from frontmatter.
 	html := strings.Replace(
 		sampleHTML,
 		`<meta property="article:published_time" content="2017-03-01T00:00:00Z">`,

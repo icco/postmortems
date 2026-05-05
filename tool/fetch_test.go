@@ -20,12 +20,9 @@ func statusHandler(status int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status) }
 }
 
-// fetcherWithMockedWayback returns a Fetcher pointed at a fresh
-// httptest stand-in for the CDX search endpoint. lookup is called with
-// the request's url+closest query params (closest is empty when the
-// production code asked for the most recent snapshot via limit=-1).
-// A non-empty timestamp encodes one data row; an empty timestamp
-// encodes "no results".
+// fetcherWithMockedWayback returns a Fetcher whose CDXURL points at an
+// httptest server. lookup gets the request's url+closest params and
+// returns one (timestamp, original) row; empty timestamp = no match.
 func fetcherWithMockedWayback(t *testing.T, lookup func(target, closest string) (timestamp, original string)) *Fetcher {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -82,9 +79,6 @@ func TestFetcher_OriginFailFallsBackToArchive(t *testing.T) {
 	origin := httptest.NewServer(statusHandler(http.StatusNotFound))
 	t.Cleanup(origin.Close)
 
-	// snap stands in for both the CDX-returned snapshot URL and the
-	// follow-up GET; its handler ignores path so any constructed URL
-	// reaching it returns the snapshot body.
 	snap := httptest.NewServer(originHandler("<html>snapshot body</html>"))
 	t.Cleanup(snap.Close)
 
@@ -94,8 +88,6 @@ func TestFetcher_OriginFailFallsBackToArchive(t *testing.T) {
 		}
 		return "", ""
 	})
-	// Re-route the constructed snapshot URL at snap instead of the
-	// real wayback host.
 	f.SnapshotPrefix = snap.URL + "/"
 
 	res, err := f.Fetch(context.Background(), origin.URL, time.Time{})
@@ -153,7 +145,7 @@ func TestFetcher_DateTargetedSnapshotIsPreferred(t *testing.T) {
 		if closest == publishedAt.UTC().Format("20060102") {
 			return "20180806000000", origin.URL
 		}
-		if closest == "" { // production sets limit=-1 instead of closest
+		if closest == "" {
 			return "20260101000000", origin.URL
 		}
 		return "", ""
@@ -178,9 +170,7 @@ func TestFetcher_DateTargetedSnapshotIsPreferred(t *testing.T) {
 	}
 }
 
-// TestFetcher_CDXFiltersStatus200 verifies the production lookup asks
-// CDX to filter to statuscode:200, so an archived 404 page never
-// becomes archive_url.
+// Pins the statuscode:200 filter so an archived 404 never becomes archive_url.
 func TestFetcher_CDXFiltersStatus200(t *testing.T) {
 	t.Parallel()
 
