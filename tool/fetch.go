@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -38,6 +39,17 @@ type Fetcher struct {
 	// AvailabilityURL overrides the Wayback availability endpoint
 	// (used by tests). Empty means defaultAvailabilityURL.
 	AvailabilityURL string
+
+	// Logger receives best-effort failures (e.g. wayback availability
+	// errors that don't abort the surrounding fetch). Nil = slog.Default.
+	Logger *slog.Logger
+}
+
+func (f *Fetcher) logger() *slog.Logger {
+	if f.Logger != nil {
+		return f.Logger
+	}
+	return slog.Default()
 }
 
 // NewFetcher returns a Fetcher with the given client timeout (15s if zero).
@@ -63,7 +75,11 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string, when time.Time) (Fet
 		return res, fmt.Errorf("empty url")
 	}
 
-	archive, _ := f.archiveLookup(ctx, rawURL, when)
+	archive, lookupErr := f.archiveLookup(ctx, rawURL, when)
+	if lookupErr != nil {
+		f.logger().Debug("wayback availability lookup failed",
+			"url", rawURL, "when", when, "err", lookupErr)
+	}
 	res.ArchiveURL = archive
 
 	html, status, originErr := f.get(ctx, rawURL)

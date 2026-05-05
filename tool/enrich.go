@@ -236,6 +236,7 @@ func EnrichPostmortems(ctx context.Context, opts enrichOptions) ([]enrichResult,
 	opts.Logger.Info("enrich starting", "files", total, "workers", opts.Concurrency, "apply", opts.Apply)
 
 	fetcher := NewFetcher(opts.HTTPTimeout)
+	fetcher.Logger = opts.Logger
 
 	jobs := make(chan string)
 	results := make(chan enrichResult)
@@ -344,7 +345,11 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	page := ExtractMetadata(fr.RawHTML)
 
 	if initialWhen.IsZero() && !page.PublishedAt.IsZero() {
-		if snap, err := fetcher.ArchiveSnapshot(ctx, pm.URL, page.PublishedAt); err == nil && snap != "" {
+		switch snap, err := fetcher.ArchiveSnapshot(ctx, pm.URL, page.PublishedAt); {
+		case err != nil:
+			opts.Logger.Debug("archive_url refinement failed",
+				"url", pm.URL, "when", page.PublishedAt, "err", err)
+		case snap != "":
 			fr.ArchiveURL = snap
 		}
 	}
