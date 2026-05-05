@@ -154,6 +154,10 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Ti
 	if endpoint == "" {
 		endpoint = defaultCDXURL
 	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", fmt.Errorf("parse cdx endpoint: %w", err)
+	}
 	q := url.Values{
 		"url":    []string{target},
 		"output": []string{"json"},
@@ -167,8 +171,9 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Ti
 	} else {
 		q.Set("closest", when.UTC().Format("20060102"))
 	}
+	u.RawQuery = q.Encode()
 
-	body, status, err := f.get(ctx, endpoint+"?"+q.Encode())
+	body, status, err := f.get(ctx, u.String())
 	if err != nil {
 		return "", err
 	}
