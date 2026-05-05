@@ -339,9 +339,7 @@ Body for ` + id + `.
 	}
 }
 
-// TestEnrich_PrefersArchiveSnapshotNearPublishedAt verifies that a
-// publication date discovered from page metadata triggers a refined
-// Wayback lookup, and the date-targeted snapshot beats the recent one.
+// A page-derived publication date should trigger a refined CDX lookup.
 func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
 	t.Parallel()
 
@@ -353,14 +351,14 @@ func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
 	dir := t.TempDir()
 	fp := writeSampleEntry(t, dir, origin.URL)
 
-	fetcher := fetcherWithMockedWayback(t, func(target, ts string) string {
+	fetcher := fetcherWithMockedWayback(t, func(target, closest string) (string, string) {
 		if target != origin.URL {
-			return ""
+			return "", ""
 		}
-		if ts == publishedAt.Format("20060102") {
-			return "http://web.archive.org/web/20170302000000/" + origin.URL
+		if closest == publishedAt.UTC().Format("20060102") {
+			return "20170302000000", origin.URL
 		}
-		return "http://web.archive.org/web/20260101000000/" + origin.URL
+		return "20260101000000", origin.URL
 	})
 
 	llm := &fakeLLM{resp: EnrichOutput{
@@ -383,14 +381,11 @@ func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
 	}
 }
 
-// TestEnrich_UsesExistingPublishedAtForArchiveLookup verifies that an
-// existing source_published_at seeds the initial Wayback lookup
-// (rather than relying on post-extraction refinement). The mock
-// asserts every availability query carries the expected timestamp.
+// A frontmatter source_published_at should seed the initial CDX lookup.
 func TestEnrich_UsesExistingPublishedAtForArchiveLookup(t *testing.T) {
 	t.Parallel()
 
-	// Strip published_time so the date can only come from frontmatter.
+	// Strip the meta tag so the date can only come from frontmatter.
 	html := strings.Replace(
 		sampleHTML,
 		`<meta property="article:published_time" content="2017-03-01T00:00:00Z">`,
@@ -416,16 +411,16 @@ A short blurb.
 		t.Fatalf("write: %v", err)
 	}
 
-	wantTS := publishedAt.Format("20060102")
-	fetcher := fetcherWithMockedWayback(t, func(target, ts string) string {
+	wantTS := publishedAt.UTC().Format("20060102")
+	fetcher := fetcherWithMockedWayback(t, func(target, closest string) (string, string) {
 		if target != origin.URL {
-			return ""
+			return "", ""
 		}
-		if ts != wantTS {
-			t.Errorf("availability lookup ts = %q, want %q", ts, wantTS)
-			return ""
+		if closest != wantTS {
+			t.Errorf("cdx lookup closest = %q, want %q", closest, wantTS)
+			return "", ""
 		}
-		return "http://web.archive.org/web/20180806000000/" + origin.URL
+		return "20180806000000", origin.URL
 	})
 
 	llm := &fakeLLM{resp: EnrichOutput{
@@ -576,20 +571,19 @@ func TestApplyTitle(t *testing.T) {
 	cases := []struct {
 		name             string
 		existing, llm, p string
-		force            bool
 		wantTitle        string
 		wantChanged      bool
 	}{
-		{"replace bad existing with good llm", "Heroku Status", "Heroku Postgres outage", "", false, "Heroku Postgres outage", true},
-		{"wipe bad existing when no replacement", "Heroku Status", "", "Wayback Machine", false, "", true},
-		{"keep good existing", "Real title", "LLM-suggested", "page-suggested", false, "Real title", false},
-		{"force overrides good existing", "Real title", "LLM-suggested", "", true, "LLM-suggested", true},
-		{"reject bad llm and bad page when existing empty", "", "Heroku Status", "Wayback Machine", false, "", false},
-		{"page fallback when llm bad", "", "Wayback Machine", "Real page title", false, "Real page title", true},
+		{"replace bad existing with good llm", "Heroku Status", "Heroku Postgres outage", "", "Heroku Postgres outage", true},
+		{"wipe bad existing when no replacement", "Heroku Status", "", "Wayback Machine", "", true},
+		{"keep good existing", "Real title", "LLM-suggested", "page-suggested", "Real title", false},
+		{"good existing wins over llm even when both are non-bad", "Real title", "LLM-suggested", "", "Real title", false},
+		{"reject bad llm and bad page when existing empty", "", "Heroku Status", "Wayback Machine", "", false},
+		{"page fallback when llm bad", "", "Wayback Machine", "Real page title", "Real page title", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, changed := applyTitle(tc.existing, tc.llm, tc.p, tc.force, nil)
+			got, changed := applyTitle(tc.existing, tc.llm, tc.p, nil)
 			if got != tc.wantTitle {
 				t.Errorf("title = %q, want %q", got, tc.wantTitle)
 			}

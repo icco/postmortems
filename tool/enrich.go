@@ -449,7 +449,8 @@ func loadPostmortem(path string) (*postmortems.Postmortem, error) {
 
 // mergeEnrichment writes fetch + LLM output into pm. Policy:
 //   - archive_url, source_fetched_at: always updated.
-//   - title/product/start/end/published_at: fill blanks; -force overwrites.
+//   - title: kept once set (only replaced if existing matches a known-bad pattern).
+//   - product/start/end/published_at: fill blanks; -force overwrites.
 //   - description: rewritten unless -keep-description; old body moves to summary.
 //   - keywords: union (case-insensitive).
 //   - categories: regex matches on the page text are unioned with existing.
@@ -493,7 +494,7 @@ func mergeEnrichment(pm *postmortems.Postmortem, fr FetchResult, page PageMetada
 		changed = append(changed, "source_fetched_at")
 	}
 
-	pm.Title, changed = applyTitle(pm.Title, llm.Title, page.Title, opts.Force, changed)
+	pm.Title, changed = applyTitle(pm.Title, llm.Title, page.Title, changed)
 	pm.Product = set("product", pm.Product, llm.Product, opts.Force)
 	pm.SourcePublishedAt = setTime("source_published_at", pm.SourcePublishedAt, page.PublishedAt, opts.Force)
 	pm.StartTime = setTime("start_time", pm.StartTime, llm.StartTime, opts.Force)
@@ -559,11 +560,12 @@ func nonBad(s string) string {
 	return s
 }
 
-// applyTitle picks the best title for pm given the llm/page candidates
-// and the -force flag, treating known-bad titles as empty so they get
-// replaced or wiped rather than persisted. Returns the new title and
-// the (possibly extended) changed list.
-func applyTitle(existing, llmTitle, pageTitle string, force bool, changed []string) (string, []string) {
+// applyTitle picks the best title for pm given the llm/page candidates,
+// treating known-bad titles as empty so they get replaced or wiped
+// rather than persisted. A non-bad existing title is never overwritten;
+// manual cleanups should not get clobbered by page-chrome the LLM
+// happens to scrape on a re-run.
+func applyTitle(existing, llmTitle, pageTitle string, changed []string) (string, []string) {
 	existingBad := isBadTitle(existing)
 	next := cmp.Or(nonBad(llmTitle), nonBad(pageTitle))
 	switch {
@@ -577,9 +579,6 @@ func applyTitle(existing, llmTitle, pageTitle string, force bool, changed []stri
 			changed = append(changed, "title")
 		}
 		return "", changed
-	case !existingBad && next != "" && force && existing != next:
-		changed = append(changed, "title")
-		return next, changed
 	default:
 		return existing, changed
 	}
