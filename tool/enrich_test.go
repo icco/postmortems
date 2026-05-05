@@ -353,14 +353,14 @@ func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
 	dir := t.TempDir()
 	fp := writeSampleEntry(t, dir, origin.URL)
 
-	fetcher := fetcherWithMockedWayback(t, func(target, ts string) string {
+	fetcher := fetcherWithMockedWayback(t, func(target, closest string) (string, string) {
 		if target != origin.URL {
-			return ""
+			return "", ""
 		}
-		if ts == publishedAt.Format("20060102") {
-			return "http://web.archive.org/web/20170302000000/" + origin.URL
+		if closest == publishedAt.UTC().Format("20060102") {
+			return "20170302000000", origin.URL
 		}
-		return "http://web.archive.org/web/20260101000000/" + origin.URL
+		return "20260101000000", origin.URL
 	})
 
 	llm := &fakeLLM{resp: EnrichOutput{
@@ -386,7 +386,7 @@ func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
 // TestEnrich_UsesExistingPublishedAtForArchiveLookup verifies that an
 // existing source_published_at seeds the initial Wayback lookup
 // (rather than relying on post-extraction refinement). The mock
-// asserts every availability query carries the expected timestamp.
+// asserts every CDX query carries the expected closest=YYYYMMDD.
 func TestEnrich_UsesExistingPublishedAtForArchiveLookup(t *testing.T) {
 	t.Parallel()
 
@@ -416,16 +416,16 @@ A short blurb.
 		t.Fatalf("write: %v", err)
 	}
 
-	wantTS := publishedAt.Format("20060102")
-	fetcher := fetcherWithMockedWayback(t, func(target, ts string) string {
+	wantTS := publishedAt.UTC().Format("20060102")
+	fetcher := fetcherWithMockedWayback(t, func(target, closest string) (string, string) {
 		if target != origin.URL {
-			return ""
+			return "", ""
 		}
-		if ts != wantTS {
-			t.Errorf("availability lookup ts = %q, want %q", ts, wantTS)
-			return ""
+		if closest != wantTS {
+			t.Errorf("cdx lookup closest = %q, want %q", closest, wantTS)
+			return "", ""
 		}
-		return "http://web.archive.org/web/20180806000000/" + origin.URL
+		return "20180806000000", origin.URL
 	})
 
 	llm := &fakeLLM{resp: EnrichOutput{

@@ -9,10 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strings"
+	"strconv"
 	"time"
-
-	"github.com/icco/postmortems"
 )
 
 const userAgent = "icco-postmortems-enricher/1.0 (+https://postmortems.app)"
@@ -30,18 +28,26 @@ type FetchResult struct {
 	UsedArchive  bool
 }
 
-const defaultAvailabilityURL = "https://archive.org/wayback/available"
+const (
+	defaultCDXURL         = "https://web.archive.org/cdx/search/cdx"
+	defaultSnapshotPrefix = "https://web.archive.org/web/"
+)
 
-// Fetcher issues source GETs and Wayback availability lookups.
+// Fetcher issues source GETs and Wayback CDX lookups.
 type Fetcher struct {
 	client *http.Client
 
-	// AvailabilityURL overrides the Wayback availability endpoint
-	// (used by tests). Empty means defaultAvailabilityURL.
-	AvailabilityURL string
+	// CDXURL overrides the Wayback CDX search endpoint (used by tests).
+	// Empty means defaultCDXURL.
+	CDXURL string
 
-	// Logger receives best-effort failures (e.g. wayback availability
-	// errors that don't abort the surrounding fetch). Nil = slog.Default.
+	// SnapshotPrefix overrides the URL prefix used when constructing a
+	// snapshot URL from a CDX (timestamp, original) pair (used by
+	// tests). Empty means defaultSnapshotPrefix.
+	SnapshotPrefix string
+
+	// Logger receives best-effort failures (e.g. CDX lookup errors
+	// that don't abort the surrounding fetch). Nil = slog.Default.
 	Logger *slog.Logger
 }
 
@@ -58,8 +64,8 @@ func NewFetcher(timeout time.Duration) *Fetcher {
 		timeout = 15 * time.Second
 	}
 	return &Fetcher{
-		client:          &http.Client{Timeout: timeout},
-		AvailabilityURL: defaultAvailabilityURL,
+		client: &http.Client{Timeout: timeout},
+		CDXURL: defaultCDXURL,
 	}
 }
 
@@ -77,7 +83,7 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string, when time.Time) (Fet
 
 	archive, lookupErr := f.archiveLookup(ctx, rawURL, when)
 	if lookupErr != nil {
-		f.logger().Debug("wayback availability lookup failed",
+		f.logger().Debug("wayback cdx lookup failed",
 			"url", rawURL, "when", when, "err", lookupErr)
 	}
 	res.ArchiveURL = archive
@@ -147,55 +153,61 @@ func (f *Fetcher) get(ctx context.Context, rawURL string) (string, int, error) {
 	return string(body), resp.StatusCode, nil
 }
 
-// archiveLookup returns the Wayback snapshot URL closest to when, or
-// "" if none. Zero when = most recent.
+// archiveLookup returns the closest 200-status Wayback snapshot URL
+// for target, or "" if none. Zero when = most recent.
+//
+// Uses the CDX server's `closest` parameter so a single round trip
+// gets us "ideally near publication date, otherwise the closest 200
+// snapshot Wayback has". The Availability API is documented as flaky
+// (sporadic empty `archived_snapshots: {}` responses for known-archived
+// URLs); CDX doesn't have that problem.
 func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Time) (string, error) {
-	endpoint := f.AvailabilityURL
+	endpoint := f.CDXURL
 	if endpoint == "" {
-		endpoint = defaultAvailabilityURL
+		endpoint = defaultCDXURL
 	}
-	q := url.Values{"url": []string{target}}
-	if !when.IsZero() {
-		q.Set("timestamp", when.UTC().Format("20060102"))
+	q := url.Values{
+		"url":    []string{target},
+		"output": []string{"json"},
+		"fl":     []string{"timestamp,original"},
+		"filter": []string{"statuscode:200"},
+		"limit":  []string{"1"},
 	}
-	endpoint += "?" + q.Encode()
+	if when.IsZero() {
+		// Most recent 200 snapshot. fastLatest skips the full scan.
+		q.Set("limit", "-1")
+		q.Set("fastLatest", "true")
+	} else {
+		q.Set("closest", when.UTC().Format("20060102"))
+	}
 
-	body, status, err := f.get(ctx, endpoint)
+	body, status, err := f.get(ctx, endpoint+"?"+q.Encode())
 	if err != nil {
 		return "", err
 	}
 	if status != http.StatusOK {
-		return "", fmt.Errorf("wayback availability returned %d", status)
+		return "", fmt.Errorf("cdx returned %d", status)
 	}
 
-	var payload struct {
-		ArchivedSnapshots struct {
-			Closest struct {
-				Available bool   `json:"available"`
-				URL       string `json:"url"`
-				Status    string `json:"status"`
-			} `json:"closest"`
-		} `json:"archived_snapshots"`
+	// CDX json output is [[col_names...], [row...], ...]. An empty
+	// match returns either `[]` or just the header row.
+	var rows [][]string
+	if err := json.Unmarshal([]byte(body), &rows); err != nil {
+		return "", fmt.Errorf("parse cdx response: %w", err)
 	}
-	if err := json.Unmarshal([]byte(body), &payload); err != nil {
-		return "", fmt.Errorf("parse wayback response: %w", err)
-	}
-
-	snap := payload.ArchivedSnapshots.Closest.URL
-	if snap == "" || !payload.ArchivedSnapshots.Closest.Available {
+	if len(rows) < 2 || len(rows[1]) < 2 {
 		return "", nil
 	}
 
-	// Wayback returns http:// even for HTTPS-capable snapshots; bump
-	// it to skip the redirect on the follow-up GET.
-	if strings.HasPrefix(snap, "http://web.archive.org/") {
-		snap = "https://" + strings.TrimPrefix(snap, "http://")
+	timestamp, original := rows[1][0], rows[1][1]
+	if _, err := strconv.ParseInt(timestamp, 10, 64); err != nil {
+		return "", fmt.Errorf("cdx returned non-numeric timestamp %q", timestamp)
 	}
-	// Rewrite to the iframe-content view so we get the original page
-	// HTML instead of the Wayback wrapper (which would set the
-	// extracted title to "Wayback Machine").
-	if _, ifSnap, ok := postmortems.ParseWaybackURL(snap); ok {
-		snap = ifSnap
+	prefix := f.SnapshotPrefix
+	if prefix == "" {
+		prefix = defaultSnapshotPrefix
 	}
-	return snap, nil
+	// `if_/` selects the iframe-content view so we get the original
+	// page HTML instead of the Wayback chrome wrapper.
+	return prefix + timestamp + "if_/" + original, nil
 }
