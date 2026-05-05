@@ -19,7 +19,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.43.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/net v0.53.0
-	google.golang.org/genai v1.55.0
+	google.golang.org/genai v1.56.0
 )
 
 require (
