@@ -571,20 +571,19 @@ func TestApplyTitle(t *testing.T) {
 	cases := []struct {
 		name             string
 		existing, llm, p string
-		force            bool
 		wantTitle        string
 		wantChanged      bool
 	}{
-		{"replace bad existing with good llm", "Heroku Status", "Heroku Postgres outage", "", false, "Heroku Postgres outage", true},
-		{"wipe bad existing when no replacement", "Heroku Status", "", "Wayback Machine", false, "", true},
-		{"keep good existing", "Real title", "LLM-suggested", "page-suggested", false, "Real title", false},
-		{"force overrides good existing", "Real title", "LLM-suggested", "", true, "LLM-suggested", true},
-		{"reject bad llm and bad page when existing empty", "", "Heroku Status", "Wayback Machine", false, "", false},
-		{"page fallback when llm bad", "", "Wayback Machine", "Real page title", false, "Real page title", true},
+		{"replace bad existing with good llm", "Heroku Status", "Heroku Postgres outage", "", "Heroku Postgres outage", true},
+		{"wipe bad existing when no replacement", "Heroku Status", "", "Wayback Machine", "", true},
+		{"keep good existing", "Real title", "LLM-suggested", "page-suggested", "Real title", false},
+		{"good existing wins over llm even when both are non-bad", "Real title", "LLM-suggested", "", "Real title", false},
+		{"reject bad llm and bad page when existing empty", "", "Heroku Status", "Wayback Machine", "", false},
+		{"page fallback when llm bad", "", "Wayback Machine", "Real page title", "Real page title", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, changed := applyTitle(tc.existing, tc.llm, tc.p, tc.force, nil)
+			got, changed := applyTitle(tc.existing, tc.llm, tc.p, nil)
 			if got != tc.wantTitle {
 				t.Errorf("title = %q, want %q", got, tc.wantTitle)
 			}
