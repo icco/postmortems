@@ -339,6 +339,107 @@ Body for ` + id + `.
 	}
 }
 
+// TestEnrich_PrefersArchiveSnapshotNearPublishedAt covers the
+// publication-date-targeted Wayback lookup: when the page exposes a
+// published_time meta tag, the recorded archive_url should be the
+// snapshot Wayback returns near that date rather than the most-recent
+// one. We pre-seed the fetcher cache for both lookup keys so neither
+// goes out to archive.org during the test.
+func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
+	t.Parallel()
+
+	origin := httptest.NewServer(originHandler(sampleHTML))
+	t.Cleanup(origin.Close)
+
+	dir := t.TempDir()
+	fp := writeSampleEntry(t, dir, origin.URL)
+
+	publishedAt := time.Date(2017, 3, 1, 0, 0, 0, 0, time.UTC) // matches sampleHTML
+	dateSnap := "https://web.archive.org/web/20170302000000if_/" + origin.URL
+	recentSnap := "https://web.archive.org/web/20260101000000if_/" + origin.URL
+
+	fetcher := NewFetcher(5 * time.Second)
+	fetcher.cacheStore(archiveCacheKey(origin.URL, publishedAt), dateSnap)
+	fetcher.cacheStore(archiveCacheKey(origin.URL, time.Time{}), recentSnap)
+
+	llm := &fakeLLM{resp: EnrichOutput{
+		ExpandedDescription: "An incident description that is clearly not junk.",
+		Confidence:          "high",
+	}}
+	opts := enrichOptions{
+		Dir: dir, Apply: true, HTTPTimeout: 5 * time.Second,
+		LLM: llm, Concurrency: 1,
+	}
+	res := enrichOne(context.Background(), fetcher, opts, fp)
+	if res.Err != nil {
+		t.Fatalf("enrichOne: %v", res.Err)
+	}
+
+	pm := readPM(t, fp)
+	if pm.ArchiveURL != dateSnap {
+		t.Errorf("pm.ArchiveURL = %q, want date-targeted %q", pm.ArchiveURL, dateSnap)
+	}
+}
+
+// TestEnrich_UsesExistingPublishedAtForArchiveLookup checks the
+// happy-path where source_published_at is already on disk: the initial
+// Fetch call should query Wayback near that date directly, without
+// needing the post-extraction refinement. We seed only the
+// date-targeted cache slot so the test fails loudly if Fetch ever
+// queries Wayback with a zero timestamp.
+func TestEnrich_UsesExistingPublishedAtForArchiveLookup(t *testing.T) {
+	t.Parallel()
+
+	// Strip the published_time meta so we know the date came from the
+	// frontmatter rather than the page.
+	html := strings.Replace(
+		sampleHTML,
+		`<meta property="article:published_time" content="2017-03-01T00:00:00Z">`,
+		"", 1,
+	)
+	origin := httptest.NewServer(originHandler(html))
+	t.Cleanup(origin.Close)
+
+	publishedAt := time.Date(2018, 8, 5, 0, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	fp := filepath.Join(dir, "55555555-5555-5555-5555-555555555555.md")
+	body := `---
+uuid: "55555555-5555-5555-5555-555555555555"
+url: "` + origin.URL + `"
+company: "ExampleCo"
+source_published_at: ` + publishedAt.Format(time.RFC3339) + `
+
+---
+
+A short blurb.
+`
+	if err := os.WriteFile(fp, []byte(body), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	dateSnap := "https://web.archive.org/web/20180806000000if_/" + origin.URL
+	fetcher := NewFetcher(5 * time.Second)
+	fetcher.cacheStore(archiveCacheKey(origin.URL, publishedAt), dateSnap)
+
+	llm := &fakeLLM{resp: EnrichOutput{
+		ExpandedDescription: "An incident description that is clearly not junk.",
+		Confidence:          "high",
+	}}
+	opts := enrichOptions{
+		Dir: dir, Apply: true, HTTPTimeout: 5 * time.Second,
+		LLM: llm, Concurrency: 1,
+	}
+	res := enrichOne(context.Background(), fetcher, opts, fp)
+	if res.Err != nil {
+		t.Fatalf("enrichOne: %v", res.Err)
+	}
+
+	pm := readPM(t, fp)
+	if pm.ArchiveURL != dateSnap {
+		t.Errorf("pm.ArchiveURL = %q, want %q", pm.ArchiveURL, dateSnap)
+	}
+}
+
 func TestEnrich_RewritesWaybackURL(t *testing.T) {
 	t.Parallel()
 

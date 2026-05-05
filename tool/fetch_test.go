@@ -30,7 +30,7 @@ func TestFetcher_OriginSuccessRecordsArchive(t *testing.T) {
 	// archive.org.
 	f.cacheStore(origin.URL, "https://web.archive.org/web/20220101000000if_/"+origin.URL)
 
-	res, err := f.Fetch(context.Background(), origin.URL)
+	res, err := f.Fetch(context.Background(), origin.URL, time.Time{})
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestFetcher_OriginFailFallsBackToArchive(t *testing.T) {
 	f := NewFetcher(5 * time.Second)
 	f.cacheStore(origin.URL, snap.URL)
 
-	res, err := f.Fetch(context.Background(), origin.URL)
+	res, err := f.Fetch(context.Background(), origin.URL, time.Time{})
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestFetcher_OriginFailNoArchiveErrors(t *testing.T) {
 	f := NewFetcher(5 * time.Second)
 	f.cacheStore(origin.URL, "") // simulate "wayback has nothing"
 
-	if _, err := f.Fetch(context.Background(), origin.URL); err == nil {
+	if _, err := f.Fetch(context.Background(), origin.URL, time.Time{}); err == nil {
 		t.Fatalf("Fetch: expected error when origin and archive both fail")
 	}
 }
@@ -96,7 +96,41 @@ func TestFetcher_EmptyURL(t *testing.T) {
 	t.Parallel()
 
 	f := NewFetcher(time.Second)
-	if _, err := f.Fetch(context.Background(), ""); err == nil {
+	if _, err := f.Fetch(context.Background(), "", time.Time{}); err == nil {
 		t.Fatalf("Fetch(\"\"): expected error")
+	}
+}
+
+func TestFetcher_DateTargetedSnapshotIsPreferred(t *testing.T) {
+	t.Parallel()
+
+	origin := httptest.NewServer(originHandler("<html>origin body</html>"))
+	t.Cleanup(origin.Close)
+
+	f := NewFetcher(5 * time.Second)
+	publishedAt := time.Date(2018, 8, 5, 0, 0, 0, 0, time.UTC)
+	dateSnap := "https://web.archive.org/web/20180806000000if_/" + origin.URL
+	recentSnap := "https://web.archive.org/web/20260101000000if_/" + origin.URL
+	// Pre-seed both cache slots so the date-targeted lookup returns a
+	// different (older) snapshot than the recent one. Requesting near
+	// the publication date should pick the older snapshot.
+	f.cacheStore(archiveCacheKey(origin.URL, publishedAt), dateSnap)
+	f.cacheStore(archiveCacheKey(origin.URL, time.Time{}), recentSnap)
+
+	res, err := f.Fetch(context.Background(), origin.URL, publishedAt)
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if res.ArchiveURL != dateSnap {
+		t.Errorf("ArchiveURL = %q, want date-targeted %q", res.ArchiveURL, dateSnap)
+	}
+
+	// Zero-time call returns the recent snapshot from the original cache slot.
+	res2, err := f.Fetch(context.Background(), origin.URL, time.Time{})
+	if err != nil {
+		t.Fatalf("Fetch zero-time: %v", err)
+	}
+	if res2.ArchiveURL != recentSnap {
+		t.Errorf("ArchiveURL (zero when) = %q, want recent %q", res2.ArchiveURL, recentSnap)
 	}
 }

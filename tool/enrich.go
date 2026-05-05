@@ -328,7 +328,12 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 		}
 	}
 
-	fr, err := fetcher.Fetch(ctx, pm.URL)
+	// Use the existing source_published_at as a hint so the Wayback
+	// availability lookup returns a snapshot captured close to when the
+	// post actually went live. When it's zero we'll still query (most
+	// recent snapshot) and refine below once the page reveals a date.
+	initialWhen := pm.SourcePublishedAt
+	fr, err := fetcher.Fetch(ctx, pm.URL, initialWhen)
 	if err != nil {
 		res.Err = fmt.Errorf("fetch: %w", err)
 		res.Changed = preChanged
@@ -338,6 +343,17 @@ func enrichOne(ctx context.Context, fetcher *Fetcher, opts enrichOptions, path s
 	res.UsedArchive = fr.UsedArchive
 
 	page := ExtractMetadata(fr.RawHTML)
+
+	// If we just discovered a publication date from the page metadata
+	// (and didn't already have one to seed Fetch with), re-query
+	// Wayback near that date and prefer the newly-found snapshot.
+	// Falls back silently to the recent snapshot already in fr if the
+	// refined lookup errors or returns nothing.
+	if initialWhen.IsZero() && !page.PublishedAt.IsZero() {
+		if snap, err := fetcher.ArchiveSnapshot(ctx, pm.URL, page.PublishedAt); err == nil && snap != "" {
+			fr.ArchiveURL = snap
+		}
+	}
 	llmIn := EnrichInput{
 		URL:         pm.URL,
 		Company:     pm.Company,
