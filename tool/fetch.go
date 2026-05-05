@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/icco/postmortems"
@@ -30,13 +29,15 @@ type FetchResult struct {
 	UsedArchive  bool
 }
 
-// Fetcher caches Wayback availability lookups per process so retries
-// don't re-hit archive.org. Build one with NewFetcher.
+const defaultAvailabilityURL = "https://archive.org/wayback/available"
+
+// Fetcher issues source GETs and Wayback availability lookups.
 type Fetcher struct {
 	client *http.Client
 
-	mu    sync.Mutex
-	cache map[string]string // origin URL -> archive snapshot URL ("" = looked up, none available)
+	// AvailabilityURL overrides the Wayback availability endpoint
+	// (used by tests). Empty means defaultAvailabilityURL.
+	AvailabilityURL string
 }
 
 // NewFetcher returns a Fetcher with the given client timeout (15s if zero).
@@ -45,17 +46,14 @@ func NewFetcher(timeout time.Duration) *Fetcher {
 		timeout = 15 * time.Second
 	}
 	return &Fetcher{
-		client: &http.Client{Timeout: timeout},
-		cache:  map[string]string{},
+		client:          &http.Client{Timeout: timeout},
+		AvailabilityURL: defaultAvailabilityURL,
 	}
 }
 
 // Fetch GETs rawURL, falling back to the closest Wayback snapshot when
-// the origin fails. ArchiveURL is recorded either way. If when is
-// non-zero, the recorded snapshot is the one Wayback considers closest
-// to that date (typically the page's publication date) so the archive
-// captures content from around when it was actually published; a zero
-// when falls back to the most recent snapshot.
+// the origin fails. ArchiveURL is recorded either way; when targets the
+// Wayback lookup at a date (zero = most recent snapshot).
 func (f *Fetcher) Fetch(ctx context.Context, rawURL string, when time.Time) (FetchResult, error) {
 	res := FetchResult{
 		OriginURL: rawURL,
@@ -100,9 +98,9 @@ func (f *Fetcher) GetRaw(ctx context.Context, rawURL string) (string, int, error
 	return f.get(ctx, rawURL)
 }
 
-// ArchiveSnapshot exposes the date-aware Wayback availability lookup so
-// callers (e.g. the enricher) can refine ArchiveURL once they discover
-// a better publication date from the fetched page.
+// ArchiveSnapshot returns the Wayback snapshot URL closest to when, or
+// "" if none. Used by the enricher to refine ArchiveURL after a
+// publication date is discovered from the page.
 func (f *Fetcher) ArchiveSnapshot(ctx context.Context, target string, when time.Time) (string, error) {
 	return f.archiveLookup(ctx, target, when)
 }
@@ -133,35 +131,24 @@ func (f *Fetcher) get(ctx context.Context, rawURL string) (string, int, error) {
 	return string(body), resp.StatusCode, nil
 }
 
-// archiveLookup returns the Wayback snapshot URL closest to when ("" if
-// none), caching results for the Fetcher's lifetime. A zero when asks
-// Wayback for the most recent snapshot. Wayback's availability API
-// returns whatever snapshot is closest to the requested timestamp, so
-// callers naturally get the "ideally near publication date, otherwise
-// the closest available" behavior in a single round trip.
+// archiveLookup returns the Wayback snapshot URL closest to when, or
+// "" if none. Zero when = most recent.
 func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Time) (string, error) {
-	key := archiveCacheKey(target, when)
-
-	f.mu.Lock()
-	if v, ok := f.cache[key]; ok {
-		f.mu.Unlock()
-		return v, nil
+	endpoint := f.AvailabilityURL
+	if endpoint == "" {
+		endpoint = defaultAvailabilityURL
 	}
-	f.mu.Unlock()
-
 	q := url.Values{"url": []string{target}}
 	if !when.IsZero() {
 		q.Set("timestamp", when.UTC().Format("20060102"))
 	}
-	endpoint := "https://archive.org/wayback/available?" + q.Encode()
+	endpoint += "?" + q.Encode()
 
 	body, status, err := f.get(ctx, endpoint)
 	if err != nil {
-		f.cacheStore(key, "")
 		return "", err
 	}
 	if status != http.StatusOK {
-		f.cacheStore(key, "")
 		return "", fmt.Errorf("wayback availability returned %d", status)
 	}
 
@@ -175,13 +162,11 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Ti
 		} `json:"archived_snapshots"`
 	}
 	if err := json.Unmarshal([]byte(body), &payload); err != nil {
-		f.cacheStore(key, "")
 		return "", fmt.Errorf("parse wayback response: %w", err)
 	}
 
 	snap := payload.ArchivedSnapshots.Closest.URL
 	if snap == "" || !payload.ArchivedSnapshots.Closest.Available {
-		f.cacheStore(key, "")
 		return "", nil
 	}
 
@@ -196,22 +181,5 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Ti
 	if _, ifSnap, ok := postmortems.ParseWaybackURL(snap); ok {
 		snap = ifSnap
 	}
-	f.cacheStore(key, snap)
 	return snap, nil
-}
-
-// archiveCacheKey scopes the cache by (target, day). A zero when stays
-// keyed only by target so the "most recent snapshot" lookup keeps its
-// own slot independent of any date-targeted lookups.
-func archiveCacheKey(target string, when time.Time) string {
-	if when.IsZero() {
-		return target
-	}
-	return target + "|" + when.UTC().Format("20060102")
-}
-
-func (f *Fetcher) cacheStore(key, val string) {
-	f.mu.Lock()
-	f.cache[key] = val
-	f.mu.Unlock()
 }

@@ -339,28 +339,29 @@ Body for ` + id + `.
 	}
 }
 
-// TestEnrich_PrefersArchiveSnapshotNearPublishedAt covers the
-// publication-date-targeted Wayback lookup: when the page exposes a
-// published_time meta tag, the recorded archive_url should be the
-// snapshot Wayback returns near that date rather than the most-recent
-// one. We pre-seed the fetcher cache for both lookup keys so neither
-// goes out to archive.org during the test.
+// TestEnrich_PrefersArchiveSnapshotNearPublishedAt verifies that a
+// publication date discovered from page metadata triggers a refined
+// Wayback lookup, and the date-targeted snapshot beats the recent one.
 func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
 	t.Parallel()
 
 	origin := httptest.NewServer(originHandler(sampleHTML))
 	t.Cleanup(origin.Close)
 
+	publishedAt := time.Date(2017, 3, 1, 0, 0, 0, 0, time.UTC) // matches sampleHTML
+
 	dir := t.TempDir()
 	fp := writeSampleEntry(t, dir, origin.URL)
 
-	publishedAt := time.Date(2017, 3, 1, 0, 0, 0, 0, time.UTC) // matches sampleHTML
-	dateSnap := "https://web.archive.org/web/20170302000000if_/" + origin.URL
-	recentSnap := "https://web.archive.org/web/20260101000000if_/" + origin.URL
-
-	fetcher := NewFetcher(5 * time.Second)
-	fetcher.cacheStore(archiveCacheKey(origin.URL, publishedAt), dateSnap)
-	fetcher.cacheStore(archiveCacheKey(origin.URL, time.Time{}), recentSnap)
+	fetcher := fetcherWithMockedWayback(t, func(target, ts string) string {
+		if target != origin.URL {
+			return ""
+		}
+		if ts == publishedAt.Format("20060102") {
+			return "http://web.archive.org/web/20170302000000/" + origin.URL
+		}
+		return "http://web.archive.org/web/20260101000000/" + origin.URL
+	})
 
 	llm := &fakeLLM{resp: EnrichOutput{
 		ExpandedDescription: "An incident description that is clearly not junk.",
@@ -376,22 +377,20 @@ func TestEnrich_PrefersArchiveSnapshotNearPublishedAt(t *testing.T) {
 	}
 
 	pm := readPM(t, fp)
-	if pm.ArchiveURL != dateSnap {
-		t.Errorf("pm.ArchiveURL = %q, want date-targeted %q", pm.ArchiveURL, dateSnap)
+	want := "https://web.archive.org/web/20170302000000if_/" + origin.URL
+	if pm.ArchiveURL != want {
+		t.Errorf("pm.ArchiveURL = %q, want date-targeted %q", pm.ArchiveURL, want)
 	}
 }
 
-// TestEnrich_UsesExistingPublishedAtForArchiveLookup checks the
-// happy-path where source_published_at is already on disk: the initial
-// Fetch call should query Wayback near that date directly, without
-// needing the post-extraction refinement. We seed only the
-// date-targeted cache slot so the test fails loudly if Fetch ever
-// queries Wayback with a zero timestamp.
+// TestEnrich_UsesExistingPublishedAtForArchiveLookup verifies that an
+// existing source_published_at seeds the initial Wayback lookup
+// (rather than relying on post-extraction refinement). The mock
+// asserts every availability query carries the expected timestamp.
 func TestEnrich_UsesExistingPublishedAtForArchiveLookup(t *testing.T) {
 	t.Parallel()
 
-	// Strip the published_time meta so we know the date came from the
-	// frontmatter rather than the page.
+	// Strip published_time so the date can only come from frontmatter.
 	html := strings.Replace(
 		sampleHTML,
 		`<meta property="article:published_time" content="2017-03-01T00:00:00Z">`,
@@ -417,9 +416,17 @@ A short blurb.
 		t.Fatalf("write: %v", err)
 	}
 
-	dateSnap := "https://web.archive.org/web/20180806000000if_/" + origin.URL
-	fetcher := NewFetcher(5 * time.Second)
-	fetcher.cacheStore(archiveCacheKey(origin.URL, publishedAt), dateSnap)
+	wantTS := publishedAt.Format("20060102")
+	fetcher := fetcherWithMockedWayback(t, func(target, ts string) string {
+		if target != origin.URL {
+			return ""
+		}
+		if ts != wantTS {
+			t.Errorf("availability lookup ts = %q, want %q", ts, wantTS)
+			return ""
+		}
+		return "http://web.archive.org/web/20180806000000/" + origin.URL
+	})
 
 	llm := &fakeLLM{resp: EnrichOutput{
 		ExpandedDescription: "An incident description that is clearly not junk.",
@@ -435,8 +442,9 @@ A short blurb.
 	}
 
 	pm := readPM(t, fp)
-	if pm.ArchiveURL != dateSnap {
-		t.Errorf("pm.ArchiveURL = %q, want %q", pm.ArchiveURL, dateSnap)
+	want := "https://web.archive.org/web/20180806000000if_/" + origin.URL
+	if pm.ArchiveURL != want {
+		t.Errorf("pm.ArchiveURL = %q, want %q", pm.ArchiveURL, want)
 	}
 }
 
