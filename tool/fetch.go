@@ -37,17 +37,11 @@ const (
 type Fetcher struct {
 	client *http.Client
 
-	// CDXURL overrides the Wayback CDX search endpoint (used by tests).
-	// Empty means defaultCDXURL.
-	CDXURL string
-
-	// SnapshotPrefix overrides the URL prefix used when constructing a
-	// snapshot URL from a CDX (timestamp, original) pair (used by
-	// tests). Empty means defaultSnapshotPrefix.
+	// CDXURL and SnapshotPrefix are test seams; empty = production defaults.
+	CDXURL         string
 	SnapshotPrefix string
 
-	// Logger receives best-effort failures (e.g. CDX lookup errors
-	// that don't abort the surrounding fetch). Nil = slog.Default.
+	// Logger receives best-effort failures. Nil = slog.Default.
 	Logger *slog.Logger
 }
 
@@ -155,12 +149,6 @@ func (f *Fetcher) get(ctx context.Context, rawURL string) (string, int, error) {
 
 // archiveLookup returns the closest 200-status Wayback snapshot URL
 // for target, or "" if none. Zero when = most recent.
-//
-// Uses the CDX server's `closest` parameter so a single round trip
-// gets us "ideally near publication date, otherwise the closest 200
-// snapshot Wayback has". The Availability API is documented as flaky
-// (sporadic empty `archived_snapshots: {}` responses for known-archived
-// URLs); CDX doesn't have that problem.
 func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Time) (string, error) {
 	endpoint := f.CDXURL
 	if endpoint == "" {
@@ -174,7 +162,6 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Ti
 		"limit":  []string{"1"},
 	}
 	if when.IsZero() {
-		// Most recent 200 snapshot. fastLatest skips the full scan.
 		q.Set("limit", "-1")
 		q.Set("fastLatest", "true")
 	} else {
@@ -189,8 +176,7 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Ti
 		return "", fmt.Errorf("cdx returned %d", status)
 	}
 
-	// CDX json output is [[col_names...], [row...], ...]. An empty
-	// match returns either `[]` or just the header row.
+	// CDX json: [[headers], [row], ...]. Empty match returns [] or just headers.
 	var rows [][]string
 	if err := json.Unmarshal([]byte(body), &rows); err != nil {
 		return "", fmt.Errorf("parse cdx response: %w", err)
@@ -207,7 +193,6 @@ func (f *Fetcher) archiveLookup(ctx context.Context, target string, when time.Ti
 	if prefix == "" {
 		prefix = defaultSnapshotPrefix
 	}
-	// `if_/` selects the iframe-content view so we get the original
-	// page HTML instead of the Wayback chrome wrapper.
+	// if_/ selects the iframe view so we get the original page, not the wrapper.
 	return prefix + timestamp + "if_/" + original, nil
 }
