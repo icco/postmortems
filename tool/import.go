@@ -40,7 +40,7 @@ func RunImport(ctx context.Context, opts importOptions) (*importResult, error) {
 
 	opts.Logger.Info("import starting", "source", opts.Source, "dir", opts.Dir)
 
-	report, err := postmortems.ExtractPostmortems(opts.Source, opts.Dir)
+	report, err := postmortems.ExtractPostmortems(ctx, opts.Source, opts.Dir)
 	if err != nil {
 		return nil, fmt.Errorf("extract: %w", err)
 	}

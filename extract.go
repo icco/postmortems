@@ -1,14 +1,18 @@
+// Package postmortems extracts, parses, validates, and represents incident
+// postmortems stored as Markdown files with YAML front matter.
 package postmortems
 
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
+	"time"
 
 	guuid "github.com/google/uuid"
 )
@@ -36,7 +40,7 @@ type ImportReport struct {
 // already exists in dir are skipped, so previously enriched fields are
 // preserved. The returned report lists freshly-saved entries so callers
 // can chain follow-up work without rescanning the directory.
-func ExtractPostmortems(loc string, dir string) (*ImportReport, error) {
+func ExtractPostmortems(ctx context.Context, loc string, dir string) (*ImportReport, error) {
 	posts, err := ValidateDir(dir)
 	if err != nil {
 		return nil, err
@@ -53,15 +57,22 @@ func ExtractPostmortems(loc string, dir string) (*ImportReport, error) {
 	}
 
 	var data []byte
-	if isURL(loc) {
-		// #nosec G107
-		resp, err := http.Get(loc)
-		if err != nil {
-			return nil, fmt.Errorf("could not get %q: %w", loc, err)
+	switch {
+	case isURL(loc):
+		reqCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		defer cancel()
+		req, rerr := http.NewRequestWithContext(reqCtx, http.MethodGet, loc, nil)
+		if rerr != nil {
+			return nil, fmt.Errorf("could not build request for %q: %w", loc, rerr)
+		}
+		// #nosec G107 -- loc is supplied by the operator running the importer.
+		resp, gerr := http.DefaultClient.Do(req)
+		if gerr != nil {
+			return nil, fmt.Errorf("could not get %q: %w", loc, gerr)
 		}
 		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				log.Warnw("failed to close response body", "error", err)
+			if cerr := resp.Body.Close(); cerr != nil {
+				log.Warnw("failed to close response body", "error", cerr)
 			}
 		}()
 
@@ -69,12 +80,12 @@ func ExtractPostmortems(loc string, dir string) (*ImportReport, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not read response body: %w", err)
 		}
-	} else if isFile(loc) {
+	case isFile(loc):
 		data, err = os.ReadFile(loc) // #nosec G304
 		if err != nil {
 			return nil, fmt.Errorf("error opening file %q: %w", loc, err)
 		}
-	} else {
+	default:
 		return nil, fmt.Errorf("%q is not a file or a url", loc)
 	}
 

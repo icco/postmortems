@@ -1,6 +1,7 @@
 package postmortems
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +22,7 @@ func TestExtractPostmortems_NewWaybackEntryIsPreUnwrapped(t *testing.T) {
 		t.Fatalf("write upstream: %v", err)
 	}
 
-	report, err := ExtractPostmortems(src, dir)
+	report, err := ExtractPostmortems(context.Background(), src, dir)
 	if err != nil {
 		t.Fatalf("ExtractPostmortems: %v", err)
 	}
@@ -37,7 +38,7 @@ func TestExtractPostmortems_NewWaybackEntryIsPreUnwrapped(t *testing.T) {
 	}
 
 	// Re-import the same upstream line: should be a no-op now.
-	report2, err := ExtractPostmortems(src, dir)
+	report2, err := ExtractPostmortems(context.Background(), src, dir)
 	if err != nil {
 		t.Fatalf("re-import: %v", err)
 	}
@@ -118,7 +119,7 @@ Body.
 		t.Fatalf("write upstream: %v", err)
 	}
 
-	report, err := ExtractPostmortems(src, dir)
+	report, err := ExtractPostmortems(context.Background(), src, dir)
 	if err != nil {
 		t.Fatalf("ExtractPostmortems: %v", err)
 	}
@@ -177,7 +178,7 @@ Long enriched body.
 		t.Fatalf("write upstream: %v", err)
 	}
 
-	report, err := ExtractPostmortems(src, dir)
+	report, err := ExtractPostmortems(context.Background(), src, dir)
 	if err != nil {
 		t.Fatalf("ExtractPostmortems: %v", err)
 	}

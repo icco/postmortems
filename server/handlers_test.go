@@ -96,13 +96,12 @@ func TestHealthzCheckHandler(t *testing.T) {
 		},
 	}
 
-	r, err := http.NewRequest(http.MethodGet, "/healthz", nil)
+	r, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			w := httptest.NewRecorder()
@@ -161,7 +160,6 @@ func TestLoadPostmortem(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -205,7 +203,6 @@ func TestLoadPostmortems(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -342,7 +339,6 @@ func TestSummarizeMarkdown(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			if got := summarizeMarkdown(tc.in, tc.max); got != tc.want {
@@ -411,7 +407,6 @@ func TestGetPostmortemsByCategory(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

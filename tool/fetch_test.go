@@ -11,13 +11,13 @@ import (
 )
 
 func originHandler(body string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(body))
 	}
 }
 
 func statusHandler(status int) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status) }
+	return func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) }
 }
 
 // fetcherWithMockedWayback returns a Fetcher whose CDXURL points at an
