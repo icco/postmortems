@@ -2,7 +2,6 @@ package postmortems
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -30,11 +29,10 @@ func TestParse(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			f, err := os.Open(filepath.Join(tc.filepath))
+			f, err := os.Open(tc.filepath)
 			if err != nil {
 				t.Errorf("error opening postmortem: %v", err)
 				return
@@ -122,7 +120,6 @@ func TestEventDatePeriod(t *testing.T) {
 		{name: "range", pm: Postmortem{StartTime: mar15, EndTime: mar20}, want: "2024-03-15 \u2013 2024-03-20"},
 	}
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			if got := tc.pm.EventDatePeriod(); got != tc.want {

@@ -554,12 +554,12 @@ func TestLooksLikeJunkDescription(t *testing.T) {
 			t.Errorf("looksLikeJunkDescription(%q) = false, want true", s)
 		}
 	}
-	real := []string{
+	realDescs := []string{
 		"On March 20, 2017, Discord experienced significant connectivity issues.",
 		"The Swedish warship Vasa embarked on its maiden voyage on August 10, 1628.",
 		"At 10:25 PM PDT, severe weather caused a utility power loss at a regional substation.",
 	}
-	for _, s := range real {
+	for _, s := range realDescs {
 		if looksLikeJunkDescription(s) {
 			t.Errorf("looksLikeJunkDescription(%q) = true, want false", s)
 		}
