@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/gernest/front v0.0.0-20210301115436-8a0b0a782d0a
-	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-chi/chi/v5 v5.3.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
