@@ -16,7 +16,7 @@ RUN go build -ldflags="-s -w" -o /pm ./tool
 RUN /pm -action=validate && /pm -action=generate
 
 # Final stage
-FROM alpine:3.23
+FROM alpine:3.24
 
 LABEL org.opencontainers.image.source=https://github.com/icco/postmortems
 LABEL org.opencontainers.image.description="Postmortem metadata from danluu/post-mortems."
