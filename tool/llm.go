@@ -60,7 +60,7 @@ func NewGeminiClient(ctx context.Context, project, location, modelName string) (
 		Model:    cmp.Or(modelName, vertex.DefaultModel),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("genai client: %w", err)
+		return nil, fmt.Errorf("vertex client: %w", err)
 	}
 	return &geminiClient{v: v}, nil
 }
