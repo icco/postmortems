@@ -4,10 +4,12 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/icco/gutil/vertex"
 	"github.com/icco/postmortems"
 	"google.golang.org/genai"
 )
@@ -43,9 +45,7 @@ type LLMClient interface {
 }
 
 type geminiClient struct {
-	client *genai.Client
-	model  string
-	cfg    *genai.GenerateContentConfig
+	v *vertex.Client
 }
 
 // NewGeminiClient builds a Vertex AI client. Uses ADC for auth.
@@ -53,44 +53,38 @@ func NewGeminiClient(ctx context.Context, project, location, modelName string) (
 	if project == "" {
 		return nil, fmt.Errorf("gcp project is required (set -gcp-project or GOOGLE_CLOUD_PROJECT)")
 	}
-	location = cmp.Or(location, "us-central1")
-	modelName = cmp.Or(modelName, "gemini-2.5-flash")
 
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		Backend:  genai.BackendVertexAI,
+	v, err := vertex.New(ctx, vertex.Config{
 		Project:  project,
-		Location: location,
+		Location: cmp.Or(location, vertex.DefaultLocation),
+		Model:    cmp.Or(modelName, vertex.DefaultModel),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("genai client: %w", err)
 	}
-
-	temp := float32(0.2)
-	cfg := &genai.GenerateContentConfig{
-		Temperature:      &temp,
-		ResponseMIMEType: "application/json",
-		ResponseSchema:   enrichSchema(),
-	}
-
-	return &geminiClient{client: client, model: modelName, cfg: cfg}, nil
+	return &geminiClient{v: v}, nil
 }
 
 func (g *geminiClient) Close() error { return nil }
 
 // Enrich asks Gemini for structured metadata for one postmortem.
 func (g *geminiClient) Enrich(ctx context.Context, in EnrichInput) (EnrichOutput, error) {
-	prompt := buildPrompt(in)
-	resp, err := g.client.Models.GenerateContent(ctx, g.model, []*genai.Content{
-		genai.NewContentFromText(prompt, genai.RoleUser),
-	}, g.cfg)
-	if err != nil {
+	resp, err := g.v.Generate(ctx, vertex.Request{
+		Parts:       vertex.Text(buildPrompt(in)),
+		Schema:      enrichSchema(),
+		Temperature: vertex.Temperature(0.2),
+	})
+	switch {
+	case errors.Is(err, vertex.ErrEmptyResponse):
+		return EnrichOutput{}, fmt.Errorf("empty response from gemini")
+	case err != nil:
 		return EnrichOutput{}, fmt.Errorf("generate: %w", err)
 	}
-	raw := strings.TrimSpace(resp.Text())
-	if raw == "" {
-		return EnrichOutput{}, fmt.Errorf("empty response from gemini")
-	}
+	raw := resp.Text
 
+	// Unmarshalled here rather than via vertex.GenerateJSON so a model that
+	// answers with prose shows up in the error. These pages are arbitrary
+	// scraped HTML; knowing what came back is most of the debugging.
 	var parsed struct {
 		Title               string   `json:"title"`
 		Product             string   `json:"product"`
