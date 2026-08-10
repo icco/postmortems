@@ -47,8 +47,8 @@ github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aN
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/hinshun/vt10x v0.0.0-20220119200601-820417d04eec h1:qv2VnGeEQHchGaZ/u7lxST/RaJw+cv273q79D81Xbog=
 github.com/hinshun/vt10x v0.0.0-20220119200601-820417d04eec/go.mod h1:Q48J4R4DvxnHolD5P8pOtXigYlRuPLGl6moFx3ulM68=
-github.com/icco/gutil v1.0.6 h1:nXei5bypKhLZ/n4wSdHuezCkGLqjWAACVKqeElzlTWM=
-github.com/icco/gutil v1.0.6/go.mod h1:JgkIYBS3g2yTSGZ7Akjnc/a7fTQXa01sLzab8Tlb5cI=
+github.com/icco/gutil v1.0.7 h1:XJIwUm+6kIsMml48fM0SCwTFykGXHn5dhwrC1WJ6O04=
+github.com/icco/gutil v1.0.7/go.mod h1:zemHUK1sGtDtJLzC736Aruo3vs47hgkVIXFDa+logvI=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 h1:Z9n2FFNUXsshfwJMBgNA0RU6/i7WVaAegv3PtuIHPMs=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51/go.mod h1:CzGEWj7cYgsdH8dAjBGEr58BoE7ScuLd+fwFZ44+/x8=
 github.com/klauspost/compress v1.19.1 h1:VsB4HPswih7mmZ8WleSFQ75c/Ui1M4trX5oAsJnhSlk=
