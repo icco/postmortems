@@ -4,8 +4,10 @@ package server
 import (
 	"compress/flate"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -789,7 +791,14 @@ func postmortemPageHandler(dir string) http.HandlerFunc {
 
 		pm, err := LoadPostmortem(dir, pmID+".md")
 		if err != nil {
-			l.Warnw("load postmortem", "pmid", pmID, zap.Error(err))
+			// pmID comes straight off the URL, so an unknown one is a routine
+			// 404 from a crawler or stale link. Only real read/parse failures
+			// are worth a warning.
+			if errors.Is(err, fs.ErrNotExist) {
+				l.Debugw("postmortem not found", "pmid", pmID)
+			} else {
+				l.Warnw("load postmortem", "pmid", pmID, zap.Error(err))
+			}
 			notFoundHandler(w, r)
 			return
 		}
