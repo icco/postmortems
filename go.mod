@@ -5,11 +5,11 @@ go 1.26.2
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/gernest/front v0.0.0-20210301115436-8a0b0a782d0a
-	github.com/go-chi/chi/v5 v5.3.1
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/icco/gutil v1.0.9
+	github.com/icco/gutil v1.0.15
 	github.com/prometheus/client_golang v1.24.1
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/unrolled/secure v1.17.0
@@ -19,7 +19,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.45.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/net v0.58.0
-	google.golang.org/genai v1.67.0
+	google.golang.org/genai v1.69.0
 )
 
 require (
