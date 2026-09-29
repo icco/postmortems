@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/icco/postmortems"
+	"go.icco.me/postmortems"
 )
 
 // badTitlePatterns matches page-chrome titles (status pages, archive

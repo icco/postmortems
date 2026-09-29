@@ -5,7 +5,7 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/icco/postmortems"
+	"go.icco.me/postmortems"
 )
 
 // Category names used by both the matcher map and tests. Mirrors the

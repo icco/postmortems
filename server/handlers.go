@@ -21,10 +21,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/icco/gutil/logging"
-	"github.com/icco/postmortems"
 	"github.com/russross/blackfriday/v2"
 	"github.com/unrolled/secure"
+	"go.icco.me/gutil/logging"
+	"go.icco.me/postmortems"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.uber.org/zap"
@@ -359,11 +359,16 @@ func notFoundHandler(w http.ResponseWriter, r *http.Request) {
 // staticOrNotFound serves files from dir, falling back to the styled 404 page
 // for missing paths.
 func staticOrNotFound(dir string) http.Handler {
-	fs := http.FileServer(http.Dir(dir))
+	root := http.Dir(dir)
+	fs := http.FileServer(root)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		clean := filepath.Clean("/" + r.URL.Path)
-		full := filepath.Join(dir, clean)
-		info, err := os.Stat(full)
+		f, err := root.Open(r.URL.Path)
+		if err != nil {
+			notFoundHandler(w, r)
+			return
+		}
+		info, err := f.Stat()
+		_ = f.Close()
 		if err != nil || info.IsDir() {
 			notFoundHandler(w, r)
 			return

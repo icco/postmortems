@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/icco/postmortems"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.icco.me/postmortems"
 	"go.opentelemetry.io/otel"
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -413,6 +413,29 @@ func TestGetPostmortemsByCategory(t *testing.T) {
 			got := getPostmortemsByCategory(tc.pms, tc.category)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("getPostmortemsByCategory() returned unexpected results (-got +want):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestStaticOrNotFound(t *testing.T) {
+	t.Chdir("..")
+	h := staticOrNotFound("static")
+
+	for _, tc := range []struct {
+		path string
+		want int
+	}{
+		{"/styles.css", http.StatusOK},
+		{"/missing.css", http.StatusNotFound},
+		{"/favicons/", http.StatusNotFound},
+		{"/../go.mod", http.StatusNotFound},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, tc.path, nil))
+			if w.Code != tc.want {
+				t.Errorf("GET %s = %d, want %d", tc.path, w.Code, tc.want)
 			}
 		})
 	}

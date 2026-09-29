@@ -13,7 +13,7 @@ import (
 	"github.com/gernest/front"
 	"github.com/goccy/go-yaml"
 	guuid "github.com/google/uuid"
-	"github.com/icco/gutil/logging"
+	"go.icco.me/gutil/logging"
 )
 
 // Postmortem is a postmortem summary plus its metadata.

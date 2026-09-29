@@ -1,6 +1,6 @@
 # postmortems
 
-[![GoDoc](https://godoc.org/github.com/icco/postmortems?status.svg)](https://godoc.org/github.com/icco/postmortems) [![Go Report Card](https://goreportcard.com/badge/github.com/icco/postmortems)](https://goreportcard.com/report/github.com/icco/postmortems)
+[![GoDoc](https://pkg.go.dev/badge/go.icco.me/postmortems.svg)](https://pkg.go.dev/go.icco.me/postmortems) [![Go Report Card](https://goreportcard.com/badge/github.com/icco/postmortems)](https://goreportcard.com/report/github.com/icco/postmortems)
 
 Public corpus of annotated postmortems, hosted at <https://postmortems.app>. Builds on
 [danluu/post-mortems](https://github.com/danluu/post-mortems) by adding categories, time
