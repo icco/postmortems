@@ -14,9 +14,9 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/icco/gutil/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.icco.me/gutil/logging"
 	"go.icco.me/postmortems"
 	"go.icco.me/postmortems/server"
 	"go.opentelemetry.io/otel"

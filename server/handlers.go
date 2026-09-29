@@ -21,9 +21,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/icco/gutil/logging"
 	"github.com/russross/blackfriday/v2"
 	"github.com/unrolled/secure"
+	"go.icco.me/gutil/logging"
 	"go.icco.me/postmortems"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"

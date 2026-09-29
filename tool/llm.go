@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/icco/gutil/vertex"
+	"go.icco.me/gutil/vertex"
 	"go.icco.me/postmortems"
 	"google.golang.org/genai"
 )

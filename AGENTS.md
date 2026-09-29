@@ -19,6 +19,6 @@ go build .       # Build binary
 
 - `main.go` — Entrypoint, HTTP routing, and server setup.
 - Data storage and postmortem collection in root package.
-- Follow icco Go conventions (`github.com/icco/gutil` for logging and template rendering).
+- Follow icco Go conventions (`go.icco.me/gutil` for logging and template rendering).
 - PR titles and commits must follow Conventional Commits with lowercase subjects.
 - Ensure all tests pass before submitting PRs.
