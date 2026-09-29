@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/icco/postmortems"
+	"go.icco.me/postmortems"
 )
 
 // danluuReadme is the default upstream source.

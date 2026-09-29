@@ -4,7 +4,7 @@ Guidance for coding agents working on postmortems.
 
 ## Project Overview
 
-A Go web application (`github.com/icco/postmortems`) that indexes and serves technology incident postmortems.
+A Go web application (`go.icco.me/postmortems`) that indexes and serves technology incident postmortems.
 
 ## Commands
 

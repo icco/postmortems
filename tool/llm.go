@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/icco/gutil/vertex"
-	"github.com/icco/postmortems"
+	"go.icco.me/postmortems"
 	"google.golang.org/genai"
 )
 

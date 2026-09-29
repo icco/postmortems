@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/icco/postmortems"
+	"go.icco.me/postmortems"
 )
 
 // fakeLLM is a stub LLMClient that returns a canned EnrichOutput so the
