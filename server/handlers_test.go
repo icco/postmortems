@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -18,6 +20,7 @@ import (
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 )
 
@@ -444,20 +447,37 @@ func TestStaticOrNotFound(t *testing.T) {
 	}
 }
 
-func TestPostmortemJSONPageHandlerMissing(t *testing.T) {
-	t.Chdir("..")
-	core, logs := observer.New(zap.DebugLevel)
-	r := chi.NewRouter()
-	r.Get("/postmortem/{id}.json", postmortemJSONPageHandler)
-
-	req := httptest.NewRequestWithContext(logging.NewContext(context.Background(), zap.New(core).Sugar()), http.MethodGet, "/postmortem/does-not-exist.json", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusNotFound {
-		t.Errorf("status = %d, want %d", w.Code, http.StatusNotFound)
+func TestPostmortemJSONPageHandlerErrors(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.MkdirAll(filepath.Join("output", "unreadable.json"), 0o750); err != nil {
+		t.Fatal(err)
 	}
-	if n := logs.FilterLevelExact(zap.ErrorLevel).Len(); n != 0 {
-		t.Errorf("logged %d errors for a missing postmortem, want 0", n)
+
+	for _, tc := range []struct {
+		id      string
+		code    int
+		level   zapcore.Level
+		message string
+	}{
+		{"does-not-exist", http.StatusNotFound, zap.DebugLevel, "postmortem json not found"},
+		{"unreadable", http.StatusInternalServerError, zap.ErrorLevel, "load postmortem json"},
+	} {
+		t.Run(tc.id, func(t *testing.T) {
+			core, logs := observer.New(zap.DebugLevel)
+			r := chi.NewRouter()
+			r.Get("/postmortem/{id}.json", postmortemJSONPageHandler)
+
+			req := httptest.NewRequestWithContext(logging.NewContext(context.Background(), zap.New(core).Sugar()), http.MethodGet, "/postmortem/"+tc.id+".json", nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != tc.code {
+				t.Errorf("status = %d, want %d", w.Code, tc.code)
+			}
+			entries := logs.All()
+			if len(entries) != 1 || entries[0].Level != tc.level || entries[0].Message != tc.message {
+				t.Errorf("logs = %+v, want one %s entry %q", entries, tc.level, tc.message)
+			}
+		})
 	}
 }
