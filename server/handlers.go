@@ -848,9 +848,14 @@ func postmortemJSONPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	jsonPM := filepath.Base(pmID + ".json")
 	data, err := os.ReadFile(filepath.Join("output", jsonPM)) // #nosec G304 -- jsonPM sanitized via filepath.Base
+	if errors.Is(err, fs.ErrNotExist) {
+		l.Debugw("postmortem json not found", "pmid", pmID)
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		l.Errorw("load postmortem json", "pmid", pmID, zap.Error(err))
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
