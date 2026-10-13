@@ -8,14 +8,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.icco.me/gutil/logging"
 	"go.icco.me/postmortems"
 	"go.opentelemetry.io/otel"
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 // TestMetricsEndpoint asserts the chi route pattern is tagged onto otelhttp metrics.
@@ -438,5 +441,23 @@ func TestStaticOrNotFound(t *testing.T) {
 				t.Errorf("GET %s = %d, want %d", tc.path, w.Code, tc.want)
 			}
 		})
+	}
+}
+
+func TestPostmortemJSONPageHandlerMissing(t *testing.T) {
+	t.Chdir("..")
+	core, logs := observer.New(zap.DebugLevel)
+	r := chi.NewRouter()
+	r.Get("/postmortem/{id}.json", postmortemJSONPageHandler)
+
+	req := httptest.NewRequestWithContext(logging.NewContext(context.Background(), zap.New(core).Sugar()), http.MethodGet, "/postmortem/does-not-exist.json", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusNotFound)
+	}
+	if n := logs.FilterLevelExact(zap.ErrorLevel).Len(); n != 0 {
+		t.Errorf("logged %d errors for a missing postmortem, want 0", n)
 	}
 }
