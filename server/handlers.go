@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -316,9 +318,24 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, view string, data an
 	}
 
 	if err := tmpl.ExecuteTemplate(w, "layout", data); err != nil {
+		if isClientDisconnect(err) {
+			l.Debugw("client disconnected during template render", "view", view, zap.Error(err))
+			return
+		}
 		l.Errorw("template execute error", "view", view, zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
+}
+
+// isClientDisconnect reports whether err is a write failure caused by the
+// client going away (broken pipe / connection reset) rather than a genuine
+// template rendering bug.
+func isClientDisconnect(err error) bool {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return opErr.Op == "write"
+	}
+	return errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET)
 }
 
 // notFoundHandler writes the styled 404 page, falling back to plain text on
