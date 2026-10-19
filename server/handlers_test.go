@@ -2,12 +2,16 @@ package server
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -477,6 +481,26 @@ func TestPostmortemJSONPageHandlerErrors(t *testing.T) {
 			entries := logs.All()
 			if len(entries) != 1 || entries[0].Level != tc.level || entries[0].Message != tc.message {
 				t.Errorf("logs = %+v, want one %s entry %q", entries, tc.level, tc.message)
+			}
+		})
+	}
+}
+
+func TestIsClientDisconnect(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"write op error", &net.OpError{Op: "write", Err: syscall.EPIPE}, true},
+		{"wrapped epipe", fmt.Errorf("flush: %w", syscall.EPIPE), true},
+		{"wrapped econnreset", fmt.Errorf("flush: %w", syscall.ECONNRESET), true},
+		{"read op error", &net.OpError{Op: "read", Err: syscall.EPIPE}, false},
+		{"unrelated error", errors.New("template: layout: bad directive"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isClientDisconnect(tc.err); got != tc.want {
+				t.Errorf("isClientDisconnect(%v) = %v, want %v", tc.err, got, tc.want)
 			}
 		})
 	}
