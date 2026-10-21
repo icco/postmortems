@@ -69,6 +69,8 @@ regex-based category suggestions → Vertex Gemini for incident
 times/product/keywords/expanded description. The original one-liner
 moves to `summary:` whenever the body is rewritten.
 
+Set `GEMINI_API_KEY` to call the Gemini API with that key instead of Vertex AI (no GCP project needed), and `GOOGLE_GEMINI_BASE_URL` to route those calls through a proxy such as LiteLLM.
+
 ```sh
 go run ./tool -action=enrich                                # dry run
 go run ./tool -action=enrich -apply                         # write changes

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -48,17 +49,23 @@ type geminiClient struct {
 	v *vertex.Client
 }
 
-// NewGeminiClient builds a Vertex AI client. Uses ADC for auth.
+// NewGeminiClient builds a Vertex AI client using ADC. A non-empty
+// GEMINI_API_KEY selects the Gemini API instead.
 func NewGeminiClient(ctx context.Context, project, location, modelName string) (LLMClient, error) {
-	if project == "" {
-		return nil, fmt.Errorf("gcp project is required (set -gcp-project or GOOGLE_CLOUD_PROJECT)")
+	model := cmp.Or(modelName, vertex.DefaultModel)
+	cfg := vertex.Config{APIKey: os.Getenv("GEMINI_API_KEY"), Model: model}
+	if cfg.APIKey == "" {
+		if project == "" {
+			return nil, fmt.Errorf("gcp project is required (set -gcp-project, GOOGLE_CLOUD_PROJECT, or GEMINI_API_KEY)")
+		}
+		cfg = vertex.Config{
+			Project:  project,
+			Location: cmp.Or(location, vertex.DefaultLocation),
+			Model:    model,
+		}
 	}
 
-	v, err := vertex.New(ctx, vertex.Config{
-		Project:  project,
-		Location: cmp.Or(location, vertex.DefaultLocation),
-		Model:    cmp.Or(modelName, vertex.DefaultModel),
-	})
+	v, err := vertex.New(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create vertex client: %w", err)
 	}
