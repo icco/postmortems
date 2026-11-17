@@ -17,6 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.icco.me/gutil/logging"
+	"go.icco.me/gutil/tracing"
 	"go.icco.me/postmortems"
 	"go.icco.me/postmortems/server"
 	"go.opentelemetry.io/otel"
@@ -107,6 +108,18 @@ enrich          Fetch each postmortem source URL (with Wayback fallback), extrac
 
 // Serve runs the HTTP server with otelhttp metrics exposed on /metrics.
 func Serve() error {
+	shutdownTracer, err := tracing.Init(context.Background(), postmortems.Service)
+	if err != nil {
+		return fmt.Errorf("tracing init: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTracer(shutdownCtx); err != nil {
+			log.Warnw("tracing shutdown", zap.Error(err))
+		}
+	}()
+
 	registry := prometheus.NewRegistry()
 	exporter, err := otelprom.New(otelprom.WithRegisterer(registry))
 	if err != nil {
