@@ -271,6 +271,7 @@ func TestPageMetaTags(t *testing.T) {
 			`<meta property="og:title" content="About postmortems.app">`,
 			`<meta property="og:type" content="website">`,
 			`<meta name="twitter:url" content="https://postmortems.app/about">`,
+			`<span aria-hidden="true"><svg`,
 		})
 	})
 

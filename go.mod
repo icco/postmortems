@@ -9,6 +9,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
+	github.com/kaugesaar/lucide-go v0.46.0
 	github.com/prometheus/client_golang v1.25.0
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/unrolled/secure v1.18.0

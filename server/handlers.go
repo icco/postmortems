@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	lucide "github.com/kaugesaar/lucide-go"
 	"github.com/russross/blackfriday/v2"
 	"github.com/unrolled/secure"
 	"go.icco.me/gutil/logging"
@@ -247,6 +248,8 @@ var templateFuncs = template.FuncMap{
 	"prettifyText":  prettifyText,
 	"firstNonEmpty": firstNonEmpty,
 	"absURL":        absURL,
+	"lucide":        lucide.Icon,
+	"dict":          lucide.Dict,
 }
 
 // absURL resolves a site-relative path against canonicalBase.
