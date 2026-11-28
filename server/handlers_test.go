@@ -271,8 +271,10 @@ func TestPageMetaTags(t *testing.T) {
 			`<meta property="og:title" content="About postmortems.app">`,
 			`<meta property="og:type" content="website">`,
 			`<meta name="twitter:url" content="https://postmortems.app/about">`,
-			`<span aria-hidden="true"><svg`,
 		})
+		if n := strings.Count(body, `<span aria-hidden="true"><svg`); n != 2 {
+			t.Errorf("footer icons rendered = %d, want 2", n)
+		}
 	})
 
 	t.Run("postmortem-page", func(t *testing.T) {
